@@ -224,7 +224,7 @@ for(alignments_number in 1:length(UTR_alignments)){
 conversion <- read.table("../../conversion_sets/ensembl_conversion.txt", header = T, stringsAsFactors = F, sep = "\t")
 #top_genes <- read.csv("../../RNAseq/data/StemVsDiff_top_DE_genes.txt", stringsAsFactors=FALSE)[,c(1,2,8)]
 alignments_names <- c("gene_bt2v1score2", "gene_bt2v1score4" , "gene_bt2v1score6", "gene_bt2v1score8", "gene_bt2v1score10")
-gene_expression <- read.csv("../../RNAseq/data/GSC_vs_nonGSC_all_differentially_expressed_genes.csv", sep = ",", stringsAsFactors = F)
+gene_expression <- read.csv("../../data_files/RNAseq_expressed_genes/GSC_vs_nonGSC_all_differentially_expressed_genes.csv", sep = ",", stringsAsFactors = F)
 
 gene_expression <- 
   unique(
@@ -283,7 +283,7 @@ for(alignments_number in 1:length(cDNA_alignments)){
   colnames(coexpression)[5:6] <- c( "gene_logFC", "gene_pval")
   # save the coexpressions to data directory
   write.table(x = coexpression, 
-              file =  paste("../data/cDNA_coexpression_", name ,".csv"),
+              file =  paste("../../data_files/coexpressions/cDNA_coexpression_", name ,".csv"),
               quote = F,
               sep = ",", 
               row.names = F)
@@ -337,9 +337,9 @@ for(alignments_number in 1:length(cDNA_alignments)){
   dev.off()
 }
 
-gene_expression <- read.csv(file =  "../../RNAseq/data/GSC_vs_nonGSC_all_differentially_expressed_transcripts.csv",
+gene_expression <- read.csv(file =  "../../data_files/RNAseq_expressed_genes/GSC_vs_nonGSC_all_differentially_expressed_transcripts.csv",
                             stringsAsFactors = F)
-top_genes <- read.csv(file = "../../RNAseq/data/GSC_vs_nonGSC_top_pval<05_differentially_expressed_transcripts.csv", 
+top_genes <- read.csv(file = "../../data_files/RNAseq_expressed_genes/GSC_vs_nonGSC_top_pval05_differentially_expressed_transcripts.csv", 
                       stringsAsFactors=FALSE)[,c(1,2,8)]
 alignments_names <- c("transcript_bt2v1score2", "transcript_bt2v1score4" , "transcript_bt2v1score6")
 
@@ -385,7 +385,7 @@ for(alignments_number in 1:length(cDNA_alignments)){
                        by = "transcript_id")
   colnames(coexpression)[6:7] <- c( "gene_logFC", "gene_pval")
   
- write.table(coexpression, paste("../data/cDNA_coexpression_", name ,".csv"), quote = F, sep = ",",row.names = F)
+ write.table(coexpression, paste("../../data_files/coexpressions/cDNA_coexpression_", name ,".csv"), quote = F, sep = ",",row.names = F)
   
   pdf(paste("../../figures/cDNA_coexpression_",name ,".pdf"), 6,4)
   print(
@@ -525,7 +525,7 @@ for(alignments_number in 1:length(promoter_alignments)){
   colnames(coexpression)[5:6] <- c( "gene_logFC", "gene_pval")
   
   write.table(x = coexpression,
-              paste("../data/promoter_coexpression_", name ,".csv"),
+              paste("../../data_files/coexpressions/promoter_coexpression_", name ,".csv"),
               quote = F, 
               sep = ",",
               row.names = F)
