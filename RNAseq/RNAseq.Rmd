@@ -15,7 +15,7 @@ This is RNAseq analysis of the comparison between GSC vs differentiated NPC (10 
 source('global.R')
 source('RNAseq_functions.R')
 
-conversion <- read.table("../../conversion_sets/ensembl_conversion.txt", header = T)
+
 
 
 
@@ -86,7 +86,7 @@ design <- model.matrix(~ cellline + celltype)
 # Normalize
 dge_counts <- 
   read.counts[rowSums(cpm(read.counts) >= 1) >= 8,] %>%
-  DGEList(counts = ) %>%
+  DGEList() %>%
   calcNormFactors(method = c("TMM"))
 
 
@@ -178,7 +178,7 @@ fgseaRes <- fgsea(pathways = pathways,
                   maxSize = 500)
 
 
-pdf("../GSEA/GSC_vs_nonGSC_gsea.pdf", 14,8)
+pdf("../../data_files/GSEA/GSC_vs_nonGSC_gsea.pdf", 14,8)
 topPathwaysUp <- fgseaRes[ES > 0][head(order(pval), n=10), pathway]
 topPathwaysDown <- fgseaRes[ES < 0][head(order(pval), n=10), pathway]
 topPathways <- c(topPathwaysUp, rev(topPathwaysDown))
@@ -199,13 +199,16 @@ dev.off()
 
 
 ```{r GSC_vs_HNPC}
-
-#load in the star counts
-read.counts <- importStarCounts("../star_v5/", column = 4)
+# load in the star counts
+read.counts <-importStarCounts("../../data_files/star_v5/", column = 4)
+# removing uneeded text from column names
+colnames(read.counts) <- gsub(pattern = "_dna_ReadsPerGene.out.tab", 
+                              "",
+                              colnames(read.counts))
 
 # write the read counts for later reference
 write.table(x = read.counts,
-            file = "../data/GSC_vs_HNPC_read.counts.txt",
+            file = "../../data_files/GSEA/GSC_vs_HNPC_read.counts.txt",
             sep = "\t",
             col.names = T)
 
@@ -240,13 +243,12 @@ celltype <- factor(c(rep("NPC",2),
 #create the design matrix based on the factors above
 design <- model.matrix(~ celltype)   
 
-#Voom recommends reads with low counts be removed
-read.counts <- 
+# reads with low counts be removed
 # converting to DGEList
 # removing low count genes
 dge_counts <- 
   read.counts[rowSums(cpm(read.counts) >= 1) >= 2,] %>%
-  DGEList(counts = read.counts)
+  DGEList()
 
 # normalization
 dge_counts <- calcNormFactors(dge_counts, 
@@ -297,7 +299,7 @@ voom_top_HGNC <- EnsembltoHGNC(voom_top)
 
 # write expression results to file
 write.table(x = voom_all_HGNC, 
-            file = "../data/GSC_vs_HNPC_all_differentially_expressed_genes.csv",
+            file = "../../data_files/RNAseq_expressed_genes/GSC_vs_HNPC_all_differentially_expressed_genes.csv",
             quote = FALSE,
             sep = ",",
             row.names = F)
