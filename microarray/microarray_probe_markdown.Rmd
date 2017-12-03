@@ -11,6 +11,7 @@ source('global.R')
 
 
 
+
 ```
 
 ```{r variable_setup}
@@ -26,7 +27,7 @@ lfc <- 0
 
 
 
-es <- createExpressionSet("../Experiments/All_PIWIL1/")
+es <- createExpressionSet("../../data_files/illumina_studio_output/All_PIWIL1/")
 #the design of the experiment. 
 #12 samples from 3 cell lines and 4 repeats each
 phenotype <- factor(c(rep(c(rep("shNT", 4), rep("shA", 4), rep("shE",4)),3),
@@ -41,25 +42,29 @@ TS <- factor(paste(batch , phenotype, cellline, 1:4, sep="."))
 design <-model.matrix(~ batch + cellline + phenotype )
 
 
-output.gct(es,filename =  "../data/piwil1")
-gct <- as.data.frame(read.gct("../data/piwil1.gct"))
+output.gct(normal =  es,
+           filename =  "../../data_files/microarray_gct/piwil1")
+gct <-
+  as.data.frame(
+    read.gct(file =  "../../data_files/microarray_gct/piwil1.gct")
+  )
 
 gct$Description <- NA
 gct$NAME <- rownames(gct)
 gct <- gct[,c(ncol(gct),ncol(gct) -1  ,1:(ncol(gct) -2))]
 colnames(gct)[3:ncol(gct)] <- as.vector(TS)
 
-if(file.exists("../data/named_piwil1.gct")){
-  file.remove("../data/named_piwil1.gct")
+if(file.exists("../../data_files/microarray_gct/named_piwil1.gct")){
+  file.remove("../../data_files/microarray_gct/named_piwil1.gct")
 }
 writeLines(c("#1.2",
              paste(nrow(gct),
                    ncol(gct) - 2, 
                    sep = "\t")), 
-           "../data/named_piwil1.gct")
+           "../../data_files/microarray_gct/named_piwil1.gct")
 
 write.table(gct,
-            file = "../data/named_piwil1.gct", 
+            file = "../../data_files/microarray_gct/named_piwil1.gct", 
             sep = "\t",
             quote = F, 
             append = T,
@@ -96,14 +101,14 @@ top <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value),
 top$logFC <- -top$logFC
 
 
-write.table(all    ,
-            file = "../data/Piwil1_all_knockdown_differentially_expressed_transcripts.txt",
+write.table(x =  all    ,
+            file = "../../data_files/microarray_expressed_genes/Piwil1_all_knockdown_differentially_expressed_transcripts.txt",
             sep = "\t", 
             row.names = F,
             quote = T)
 
-write.table(top    ,
-            file = "../data/Piwil1_all_knockdown_top_pval05_differentially_expressed_transcripts.txt", 
+write.table(x = top    ,
+            file = "../../data_files/microarray_expressed_genes/Piwil1_all_knockdown_top_pval05_differentially_expressed_transcripts.txt", 
             sep = "\t",
             row.names = F,
             quote = T)
@@ -111,13 +116,13 @@ write.table(top    ,
 write.table(aggregate(data =top[top$SYMBOL != "",c(2,5,8)], 
                       . ~ SYMBOL,
                       FUN = mean),
-            file = "../data/Crosstalker_Piwil1_all_knockdown_top_pval05_differentially_expressed_transcripts.txt", 
+            file = "../../data_files/microarray_expressed_genes/Crosstalker_Piwil1_all_knockdown_top_pval05_differentially_expressed_transcripts.txt", 
             sep = "\t", 
             row.names = F,
             quote = T )
 
 ct_top <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value),
-                 topTable(fit,
+                 topTable(fit = fit,
                           coef = 8,
                           sort.by = "p",
                           number = "all", 
@@ -125,7 +130,7 @@ ct_top <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value),
                           p.value = .05))
 ct_top$logFC <- -ct_top$logFC
 write.table(aggregate(data =ct_top[ct_top$SYMBOL != "",c(2,5,8)], . ~ SYMBOL, FUN = mean),
-            file = "../data/Crosstalker_Piwil1_all_knockdown_top_pval05_LFC_1_differentially_expressed_transcripts.txt", 
+            file = "../../data_files/microarray_expressed_genes/Crosstalker_Piwil1_all_knockdown_top_pval05_LFC_1_differentially_expressed_transcripts.txt", 
             sep = "\t", 
             row.names = F, 
             quote = T )
@@ -143,23 +148,26 @@ fit <- lmFit(es, design)
 fit <- eBayes(fit)
 results <- decideTests(fit)
 
-pdf("../figures/PIWIL1_venndiagram.pdf", 12,12)
+pdf("../../data_files/microarray_expressed_genes/PIWIL1_venndiagram.pdf", 12,12)
 vennDiagram(results[,c(5:8)], include = c("up","down"))
 dev.off()
 
-top <- subset(select = -c(CHROMOSOME,
-                          ILMN_GENE,
-                          SEARCH_KEY, 
-                          Status, 
-                          P.Value),
-              topTable(fit,
-                       coef = 6,
-                       sort.by = "p", 
-                       number = "all",
-                       lfc = 0,
-                       p.value = 0.05))
 
 
+
+
+top <- 
+  topTable(fit = fit,
+           coef = 6,
+           sort.by = "p", 
+           number = "all",
+           lfc = 0,
+           p.value = 0.05) %>% 
+  subset(select = -c(CHROMOSOME,
+                     ILMN_GENE,
+                     SEARCH_KEY, 
+                     Status, 
+                     P.Value))
 
 
 
@@ -172,7 +180,7 @@ top <- subset(select = -c(CHROMOSOME,
 #conrasts
 
 
-es <- createExpressionSet("../Experiments/All_PIWIL1/")
+es <- createExpressionSet("../../data_files/illumina_studio_output/All_PIWIL1/")
 
 
  #thedesign of the experiment. 
@@ -203,41 +211,45 @@ contrasts <- makeContrasts(
   levels = design
 )
 
-contrasts <- makeContrasts(
-  NTvT =(  (sh3691.A-sh3691.NT + sh3691.E-sh3691.NT + sh3691.B-sh3691.NT + sh3691.C-sh3691.NT)/4 +
-           (sh3832.A-sh3832.NT + sh3832.E-sh3832.NT + sh3832.B-sh3832.NT + sh3832.C-sh3832.NT)/4 + 
-           (sh4121.A-sh4121.NT + sh4121.E-sh4121.NT + sh4121.B-sh4121.NT + sh4121.C-sh4121.NT)/4)/3,
-  levels = design
-)
+# contrasts <- makeContrasts(
+#   NTvT =(  (sh3691.A-sh3691.NT + sh3691.E-sh3691.NT + sh3691.B-sh3691.NT + sh3691.C-sh3691.NT)/4 +
+#            (sh3832.A-sh3832.NT + sh3832.E-sh3832.NT + sh3832.B-sh3832.NT + sh3832.C-sh3832.NT)/4 + 
+#            (sh4121.A-sh4121.NT + sh4121.E-sh4121.NT + sh4121.B-sh4121.NT + sh4121.C-sh4121.NT)/4)/3,
+#   levels = design
+#)
 
 
 
 fit2 <- contrasts.fit(fit,contrasts)
 fit2 <- eBayes(fit2)
 
-all <- subset(select = -c(CHROMOSOME,
-                          ILMN_GENE,
-                          SEARCH_KEY, 
-                          Status, 
-                          P.Value),
-              topTable(fit2, 
-                       coef = 1,
-                       sort.by = "p",
-                       number = "all", 
-                       lfc = 0, 
-                       p.value = 1))
+all <- 
+  topTable(fit2, 
+           coef = 1,
+           sort.by = "p",
+           number = "all", 
+           lfc = 0, 
+           p.value = 1) %>%
+  subset(select = -c(CHROMOSOME,
+                     ILMN_GENE,
+                     SEARCH_KEY, 
+                     Status, 
+                     P.Value)
+  )
 
-top <- subset(select = -c(CHROMOSOME,
-                          ILMN_GENE,
-                          SEARCH_KEY, 
-                          Status, 
-                          P.Value),
-              topTable(fit2,
-                       coef = 1,
-                       sort.by = "p",
-                       number = "all",
-                       lfc = 0, 
-                       p.value = .05))
+top <- 
+  topTable(fit2,
+           coef = 1,
+           sort.by = "p",
+           number = "all",
+           lfc = 0, 
+           p.value = .05) %>%
+  subset(select = -c(CHROMOSOME,
+                     ILMN_GENE,
+                     SEARCH_KEY, 
+                     Status, 
+                     P.Value)
+  )
 
 ```
 
