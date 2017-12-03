@@ -19,6 +19,7 @@ conversion <- read.table("../../conversion_sets/ensembl_conversion.txt", header 
 
 
 
+
 ```
 
 
@@ -27,7 +28,7 @@ conversion <- read.table("../../conversion_sets/ensembl_conversion.txt", header 
 ```{r GSC_vs_nonGSC}
 
 # load in the star counts
-read.counts <-importStarCounts("../star_v5/", column = 4)
+read.counts <-importStarCounts("../../data_files/star_v5/", column = 4)
 # removing uneeded text from column names
 colnames(read.counts) <- gsub(pattern = "_dna_ReadsPerGene.out.tab", 
                               "",
@@ -43,7 +44,7 @@ colnames(read.counts) <- c("387++","456++","3359++","3691++","3832++","4121++","
                            "hNP1_old","hNP1_new","17231","16157")
 # write the read counts for later reference
 write.table(x = read.counts,
-            file = "../data/all_read.counts.txt",
+            file = "../../data_files/RNAseq_read_counts/all_read.counts.txt",
             sep = "\t",
             col.names = T)
 
@@ -64,7 +65,7 @@ read.counts <- subset(read.counts,
 
 # write this experiments counts to a file
 write.table(x = read.counts, 
-            file = "../data/GSC_and_nonGSC_read.counts.txt",
+            file = "../../data_files/RNAseq_read_counts/GSC_and_nonGSC_readcounts.txt",
             sep = "\t",
             col.names = T)
 # organize to that the non-GSCs are the first and the control samples. GSCs are the treatments
@@ -118,7 +119,7 @@ voom_all <- topTable(fit = fit,
                      number = nrow(voom_counts)
                      )
 #voom fold changes and p values based on significant hits
-voom_top <- topTable(fit = it,
+voom_top <- topTable(fit = fit,
                      coef = "celltypeS",
                      sort.by="p",
                      number =nrow(voom_counts),
@@ -135,12 +136,12 @@ voom_top_HGNC <- EnsembltoHGNC(voom_top)
 #commented out for use only when needed
 
 write.table(x = voom_all_HGNC, 
-            file = "../data/GSC_vs_nonGSC_all_differentially_expressed_genes.csv",
+            file = "../../data_files/RNAseq_expressed_genes/GSC_vs_nonGSC_all_differentially_expressed_genes.csv",
             quote = FALSE, 
             sep = ",", 
             row.names = T)
 write.table(x = voom_top_HGNC,
-            file = "../data/GSC_vs_nonGSC_top_pval05_differentially_expressed_genes.csv", 
+            file = "../../data_files/RNAseq_expressed_genes/GSC_vs_nonGSC_top_pval05_differentially_expressed_genes.csv", 
             quote = FALSE, 
             sep = ",",
             row.names = T)
