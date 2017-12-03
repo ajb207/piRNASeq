@@ -1,0 +1,98 @@
+---
+title: "Microarray GSEA Analysis"
+author: "Andrew Burr"
+date: "August 22, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+
+source("../../code/FGSEA.R")
+
+
+
+
+
+```
+
+
+
+
+
+```{r All_Piwil1}
+
+
+
+
+GSEA_table(expressions = read.csv("../data/Piwil1_all_knockdown_differentially_expressed_transcripts.csv"),
+           conversions = read.table("../../conversion_sets/ensembl_to_entrez.txt", stringsAsFactors = F, sep = "\t", header = T))
+
+
+enrichment_plot(expressions = read.csv("../data/Piwil1_all_knockdown_differentially_expressed_transcripts.csv"),
+                pathway = "Organelle biogenesis and maintenance",
+                conversions = read.table("../../conversion_sets/ensembl_to_entrez.txt", stringsAsFactors = F, sep = "\t", header = T))
+
+
+pdf("../figures/Piwil1_knockdown_E_gsea.pdf", 24,12)
+GSEA_table(expressions = read.csv("../data/Piwil1_knockdown_E_differentially_expressed_transcripts.csv"),
+           conversions = read.table("../../conversion_sets/ensembl_to_entrez.txt", stringsAsFactors = F, sep = "\t", header = T))
+dev.off()
+
+pdf("../figures/PIWIL1_E_EXAMPLE_PATHWAY.pdf",12,12)
+enrichment_plot(expressions = read.csv("../data/Piwil1_knockdown_E_differentially_expressed_transcripts.csv"),
+                pathway = "KEGG_ONE_CARBON_POOL_BY_FOLATE",
+                conversions = read.table("../../conversion_sets/ensembl_to_entrez.txt", stringsAsFactors = F, sep = "\t", header = T))
+dev.off()
+
+
+GSEA_table(expressions = read.csv("../data/Piwil1_knockdown_B_differentially_expressed_transcripts.csv"),
+           conversions = read.table("../../conversion_sets/ensembl_to_entrez.txt", stringsAsFactors = F, sep = "\t", header = T))
+
+
+enrichment_plot(expressions = read.csv("../data/Piwil1_all_knockdown_differentially_expressed_transcripts.csv"),
+                pathway = "Organelle biogenesis and maintenance",
+                conversions = read.table("../../conversion_sets/ensembl_to_entrez.txt", stringsAsFactors = F, sep = "\t", header = T))
+
+
+
+```
+
+
+
+```{r venn_diagram}
+
+test <- read.csv("../data/Piwil1_knockdown_A_top_pval<05_differentially_expressed_transcripts.csv")[,c(2,5)]
+test <- test[test$SYMBOL != "",]
+test <- merge(test,  read.csv("../data/Piwil1_knockdown_E_top_pval<05_differentially_expressed_transcripts.csv")[,c(2,5)], by = "SYMBOL", all = T)
+test <- test[test$SYMBOL != "",]
+test <- merge(test,  read.csv("../data/Piwil1_knockdown_B_top_pval<05_differentially_expressed_transcripts.csv")[,c(2,5)], by = "SYMBOL", all = T)
+test <- test[test$SYMBOL != "",]
+test <- merge(test,  read.csv("../data/Piwil1_knockdown_C_top_pval<05_differentially_expressed_transcripts.csv")[,c(2,5)], by = "SYMBOL", all = T)
+test <- test[test$SYMBOL != "",]
+colnames(test) <- c("SYMBOL", "A", "E", "B", "C")
+
+
+test <- aggregate(data =test, . ~ SYMBOL, FUN = mean, na.action = na.pass) 
+test[is.na(test)] <- 0
+
+
+rownames(test) <- test$SYMBOL
+test1 <- test[,-1]
+test1[test1 > 0] <- 1 
+test1[test1 < 0] <- -1 
+
+test2 <- test[,-1]
+test2[test2 >= 1] <- 1 
+test2[test2 <= -1] <- -1 
+test2 <- round(test2)
+
+
+vennDiagram(test1, include = c("up","down"))
+png("../figures/PIWIL1_venndiagram.png")
+vennDiagram(test2, include = c("up","down"))
+dev.off()
+```
+
+
+

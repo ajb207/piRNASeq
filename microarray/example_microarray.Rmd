@@ -1,0 +1,124 @@
+---
+title: "Example Microaray"
+author: "Andrew Burr"
+date: "March 30, 2017"
+output: html_document
+---
+
+
+```{r libraries&data, echo = FALSE, warning=FALSE}
+
+# Load libraries
+library(knitr)
+library(edgeR)
+library(biomaRt)
+library(ggplot2)
+library(beadarray)
+library(limma)
+library(illuminaHumanv4.db)
+library("simpleaffy")
+library("affyQCReport")
+library(annotate)
+require(reshape)
+#library("lumi")
+
+
+#creates an expression set from microarray data for analysis with limma
+createExpressionSet <- function(projectFolder ){
+# Load data
+## location of your probe and qc files
+dataFile <- paste(projectFolder, "Data/SampleProbeProfile.txt", sep="")
+qcFile <-   paste(projectFolder,"Data/ControlProbeProfile.txt", sep="")
+## create an expressionset
+eset <- readBeadSummaryData(dataFile=dataFile, qcFile=qcFile,
+                            ProbeID="PROBE_ID", controlID="ProbeID",
+                            skip=0, qc.skip=0,
+                            annoCols=c("SYMBOL", "DEFINITION", "SYNONYMS", "CHROMOSOME", "ILMN_GENE", "SEARCH_KEY"))
+
+#plot(eset, what = "lumi::boxplot", logMode = FALSE)
+
+# Normalize, transform
+eset <- normaliseIllumina(eset, method="quantile", transform= "log2")
+
+# Some of limma's stuff downstream doesn't work with whatever kind
+# of object that you get out of normaliseIllumina().
+# I coerce it to an "ExpressionSet" and everything seems to work fine.
+class(eset) <- "ExpressionSet"
+
+return(eset)
+
+# Analyze with limma
+## Make a design matrix
+## Make a contrast matrix
+## analyze the normal way: lmFit(), contrasts.fit(), eBayes(), topTable()
+}
+
+
+
+getGeneResults <- function(results, fit, line){
+  
+significant_rows <- apply(abs(results), MARGIN =  1, FUN = sum) >= 1 
+probe_conversion <- subset(select = c(ProbeID, SYMBOL),
+                 x = topTable(fit[significant_rows,],
+                              number = "all",
+                              lfc = lfc, 
+                              p.value = .05)
+                 )
+results <- as.data.frame(results)
+results$ProbeID <- rownames(results)
+results_table <- merge(results, probe_conversion, by = "ProbeID")
+rownames(results_table) <- results_table$ProbeID
+results_table <- subset(results_table, select = -ProbeID)
+results <- subset(results, select = -ProbeID)
+colnames(results_table) <- c(paste(colnames(results), line, sep ="_"), "SYMBOL")
+return(results_table)
+}
+```
+
+```{r variable_setup}
+
+lfc <- 1
+```
+
+**EXAMPLE**
+
+
+
+```{r cell_line_4121_AE, error=T}
+
+#DESIGN OF THE EXPERIMENT
+`cell_`=factor(c(rep("shNT", 4), rep("shA", 4), rep("shE",4)), levels = c("shNT", "shA", "shE"))
+design <-model.matrix(~`cell_` + 0)
+rm('cell_')
+
+#convert the probe data to an illumina ExpressionSet required for analysis
+c4121_ES_AE <- createExpressionSet("../Experiments/Cell_Line_4121_AE/")
+
+
+
+#mds Plot of the cell lines
+#cell lines are placed based on typical distances of the top log2 fold changes
+plotMDS(c4121_ES_AE, labels = designArray, cex = .7)
+
+#doing a linear fit of the data
+fit_c4121L <- lmFit(c4121_ES_AE, design)
+#creating the contasts, the differences, between each cell type
+contrasts <- makeContrasts(cell_shA-cell_shNT, cell_shE-cell_shNT, levels = design)
+fit_c4121L <- contrasts.fit(fit_c4121L, contrasts)
+fit_c4121L <- eBayes(fit_c4121L, trend = TRUE)
+
+
+#find probes with at least 1 log fold change difference in shNT vs both shA and shE and put in a venn diagram
+results <- decideTests(fit_c4121L[, c("cell_shA - cell_shNT", "cell_shE - cell_shNT")], 
+                       lfc = lfc, 
+                       p.value = .05)
+#create a venn diagram showing the number of  up and down regulated probes
+vennDiagram(results, 
+            include = c("up", "down"), 
+            names = c("shA-shNT","shE-shNT"))
+
+
+A_4121_top <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value),topTable(fit_c4121L, coef = 1,sort.by = "p", number = "all", lfc = lfc, p.value = .05))
+
+
+E_4121_top <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value),topTable(fit_c4121L, coef = 2,sort.by = "p", number = "all", lfc = lfc, p.value = .05))

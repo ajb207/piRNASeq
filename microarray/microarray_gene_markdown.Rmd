@@ -1,0 +1,205 @@
+---
+title: "Microarray Presentation"
+author: "Andrew Burr"
+date: "March 31, 2016"
+output: html_document
+---
+
+
+```{r libraries&data}
+
+# Load libraries
+library(knitr)
+library(edgeR)
+library(biomaRt)
+library(ggplot2)
+library(gplots)
+library(beadarray)
+library(limma)
+library(illuminaHumanv4.db)
+library("simpleaffy")
+library("affyQCReport")
+library(annotate)
+
+
+#creates an expression set from microarray data for analysis with limma
+createExpressionSet <- function(projectFolder){
+# Load data
+## location of your probe and qc files
+dataFile <- paste(projectFolder, "Data/SampleGeneProfile.txt", sep="")
+qcFile <-   paste(projectFolder,"Data/ControlGeneProfile.txt", sep="")
+## create an expressionset
+eset <- readBeadSummaryData(dataFile=dataFile, qcFile=qcFile,
+                            ProbeID="SYMBOL", controlID="TargetID",
+                            skip=0, qc.skip=0,
+                            annoCols=c( "DEFINITION", "SYNONYMS", "CHROMOSOME", "ILMN_GENE", "SEARCH_KEY"))
+
+# Normalize, transform
+eset <- normaliseIllumina(eset, method="quantile", transform= "log2")
+
+# Some of limma's stuff downstream doesn't work with whatever kind
+# of object that you get out of normaliseIllumina().
+# I coerce it to an "ExpressionSet" and everything seems to work fine.
+class(eset) <- "ExpressionSet"
+
+return(eset)
+
+# Analyze with limma
+## Make a design matrix
+## Make a contrast matrix
+## analyze the normal way: lmFit(), contrasts.fit(), eBayes(), topTable()
+}
+
+```
+
+
+
+
+```{r creating_fits}
+designArray=c("A","A","A","A", "B","B","B","B", "C","C","C","C")
+designArray=c("shNT","shNT","shNT","shNT", "shB","shB","shB","shB", "shC","shC","shC","shC")
+
+`cell_` <- factor(designArray)
+design <-model.matrix(~`cell_` + 0)
+
+
+```
+
+
+```{r cell_line_3691_v2}
+c3691_ES <- createExpressionSet("Cell_Line_3691_v2/")
+
+plotMDS(c3691_ES, labels = designArray)
+
+fit_c3691L <- eBayes(lmFit(c3691_ES, design))
+#View(topTable(fit_c3691L, sort.by="F", number =nrow(fit_c3691L$p.value)))
+
+contrasts <- makeContrasts(cell_shNT-cell_shB, cell_shNT-cell_shC, cell_shB-cell_shC, levels = design)
+contrasts_c3691L <- contrasts.fit(fit_c3691L, contrasts)
+contrasts_c3691L <- eBayes(contrasts_c3691L, trend = TRUE)
+
+results <- decideTests(contrasts_c3691L[, c("cell_shNT - cell_shA", "cell_shNT - cell_shE")], lfc = 1)
+vennDiagram(results, include = c("up", "down"), names = c("shNT-shA","shNT-shE"))
+
+
+LP.sig <- rowSums(results>0)==2
+topTable(contrasts_c3691L[LP.sig,])
+LP.sig <- rowSums(results<0)==2
+topTable(contrasts_c3691L[LP.sig,])
+```
+
+
+```{r cell_line_3832_v2}
+
+c3832_ES <- createExpressionSet("Cell_Line_3832_v2/")
+
+plotMDS(c3832_ES, labels = designArray)
+
+fit_c3832L <- eBayes(lmFit(c3832_ES, design))
+#View(topTable(fit_c3832L, sort.by="F", number =nrow(fit_c3832L$p.value)))
+
+contrasts <- makeContrasts(cell_shNT-cell_shA, cell_shNT-cell_shE, cell_shA-cell_shE, levels = design)
+contrasts_c3832L <- contrasts.fit(fit_c3832L, contrasts)
+contrasts_c3832L <- eBayes(contrasts_c3832L, trend = TRUE)
+
+results <- decideTests(contrasts_c3832L[, c("cell_shNT - cell_shA", "cell_shNT - cell_shE")], lfc = 1)
+vennDiagram(results, include = c("up", "down"), names = c("shNT-shA","shNT-shE"))
+
+
+
+LP.sig <- rowSums(results>0)==2
+topTable(contrasts_c3832L[LP.sig,])
+
+
+```
+
+
+```{r cell_line_4121_v2}
+c4121_ES <- createExpressionSet("Cell_Line_4121_v2/")
+
+plotMDS(c4121_ES, labels = designArray)
+
+fit_c4121L <- eBayes(lmFit(c4121_ES, design))
+#View(topTable(fit_c4121L, sort.by="F", number =nrow(fit_c4121L$p.value)))
+
+contrasts <- makeContrasts(cell_shNT-cell_shA, cell_shNT-cell_shE, cell_shA-cell_shE, levels = design)
+contrasts_c4121L <- contrasts.fit(fit_c4121L, contrasts)
+contrasts_c4121L <- eBayes(contrasts_c4121L, trend = TRUE)
+
+results <- decideTests(contrasts_c4121L[, c("cell_shNT - cell_shA", "cell_shNT - cell_shE")], lfc = 1)
+vennDiagram(results, include = c("up", "down"), names = c("shNT-shA","shNT-shE"))
+
+
+LP.sig <- rowSums(results>0)==2
+topTable(contrasts_c4121L[LP.sig,])
+
+```
+
+
+```{r cell_line_3691}
+c3691_ES <- createExpressionSet("Cell_Line_3691_v2/")
+
+plotMDS(c3691_ES, labels = designArray)
+
+fit_c3691L <- eBayes(lmFit(c3691_ES, design))
+#View(topTable(fit_c3691L, sort.by="F", number =nrow(fit_c3691L$p.value)))
+
+contrasts <- makeContrasts(cell_shNT-cell_shA, cell_shNT-cell_shE, cell_shA-cell_shE, levels = design)
+contrasts_c3691L <- contrasts.fit(fit_c3691L, contrasts)
+contrasts_c3691L <- eBayes(contrasts_c3691L, trend = TRUE)
+
+results <- decideTests(contrasts_c3691L[, c("cell_shNT - cell_shA", "cell_shNT - cell_shE")], lfc = 1)
+vennDiagram(results, include = c("up", "down"), names = c("shNT-shA","shNT-shE"))
+
+
+LP.sig <- rowSums(results>0)==2
+topTable(contrasts_c3691L[LP.sig,])
+
+```
+
+```{r cell_line_3832}
+
+c3832_ES <- createExpressionSet("Cell_Line_3832/")
+
+plotMDS(c3832_ES, labels = designArray)
+
+fit_c3832L <- eBayes(lmFit(c3832_ES, design))
+#View(topTable(fit_c3832L, sort.by="F", number =nrow(fit_c3832L$p.value)))
+
+contrasts <- makeContrasts(cell_shNT-cell_shA, cell_shNT-cell_shE, cell_shA-cell_shE, levels = design)
+contrasts_c3832L <- contrasts.fit(fit_c3832L, contrasts)
+contrasts_c3832L <- eBayes(contrasts_c3832L, trend = TRUE)
+
+results <- decideTests(contrasts_c3832L[, c("cell_shNT - cell_shA", "cell_shNT - cell_shE")], lfc = 1)
+vennDiagram(results, include = c("up", "down"), names = c("shNT-shA","shNT-shE"))
+
+
+
+LP.sig <- rowSums(results>0)==2
+topTable(contrasts_c3832L[LP.sig,])
+
+
+```
+
+
+```{r cell_line_4121}
+c4121_ES <- createExpressionSet("Cell_Line_4121/")
+
+plotMDS(c4121_ES, labels = designArray)
+
+fit_c4121L <- eBayes(lmFit(c4121_ES, design))
+#View(topTable(fit_c4121L, sort.by="F", number =nrow(fit_c4121L$p.value)))
+
+contrasts <- makeContrasts(cell_shNT-cell_shA, cell_shNT-cell_shE, cell_shA-cell_shE, levels = design)
+contrasts_c4121L <- contrasts.fit(fit_c4121L, contrasts)
+contrasts_c4121L <- eBayes(contrasts_c4121L, trend = TRUE)
+
+results <- decideTests(contrasts_c4121L[, c("cell_shNT - cell_shA", "cell_shNT - cell_shE")], lfc = 1)
+vennDiagram(results, include = c("up", "down"), names = c("shNT-shA","shNT-shE"))
+
+
+LP.sig <- rowSums(results>0)==2
+topTable(contrasts_c4121L[LP.sig,])
+
+```
+

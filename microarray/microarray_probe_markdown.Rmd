@@ -1,0 +1,671 @@
+---
+title: "Microarray Presentation"
+author: "Andrew Burr"
+date: "March 31, 2016"
+output: html_document
+---
+
+
+```{r libraries&data, echo = FALSE, warning=FALSE}
+source('global.R')
+
+#creates an expression set from microarray data for analysis with limma
+createExpressionSet <- function(projectFolder ){
+# Load data
+## location of your probe and qc files
+dataFile <- paste(projectFolder, "Data/SampleProbeProfile.txt", sep="")
+qcFile <-   paste(projectFolder,"Data/ControlProbeProfile.txt", sep="")
+## create an expressionset
+eset <- readBeadSummaryData(dataFile=dataFile, qcFile=qcFile,
+                            ProbeID="PROBE_ID", controlID="ProbeID",
+                            skip=0, qc.skip=0,
+                            annoCols=c("SYMBOL", "DEFINITION", "SYNONYMS", "CHROMOSOME", "ILMN_GENE", "SEARCH_KEY"))
+
+#plot(eset, what = "lumi::boxplot", logMode = FALSE)
+
+# Normalize, transform
+eset <- normaliseIllumina(eset, method="quantile", transform= "log2")
+
+# Some of limma's stuff downstream doesn't work with whatever kind
+# of object that you get out of normaliseIllumina().
+# I coerce it to an "ExpressionSet" and everything seems to work fine.
+class(eset) <- "ExpressionSet"
+
+return(eset)
+
+# Analyze with limma
+## Make a design matrix
+## Make a contrast matrix
+## analyze the normal way: lmFit(), contrasts.fit(), eBayes(), topTable()
+}
+
+
+
+#probe_conversion <- read.delim("../gene_symbol_probe_id_gene_name.txt", stringsAsFactors=FALSE)
+
+#probe_to_gene <- function(top_table){
+  
+#  top_table$probes <- rownames(top_table)
+#  return(merge(top_table, probe_conversion, by.x = "probes", by.y = "probe_id", all.x=TRUE))
+#}
+
+getGeneResults <- function(results, fit, line){
+  
+  significant_rows <- apply(abs(results), MARGIN =  1, FUN = sum) >= 1 
+  probe_conversion <- subset(select = c(ProbeID, SYMBOL),
+                             x = topTable(fit[significant_rows,],
+                                          number = "all",
+                                          lfc = lfc, 
+                                          p.value = .05)
+  )
+  results <- as.data.frame(results)
+  results$ProbeID <- rownames(results)
+  results_table <- merge(results, probe_conversion, by = "ProbeID")
+  rownames(results_table) <- results_table$ProbeID
+  results_table <- subset(results_table, select = -ProbeID)
+  results <- subset(results, select = -ProbeID)
+  colnames(results_table) <- c(paste(colnames(results), line, sep ="_"), "SYMBOL")
+  return(results_table)
+}
+
+
+
+
+
+
+```
+
+```{r variable_setup}
+# set the global cut off for logFC
+lfc <- 0
+```
+
+
+#PIWIL1 Knockdown Microarray
+
+
+```{r all_PIWIL1}
+
+
+
+es <- createExpressionSet("../Experiments/All_PIWIL1/")
+#the design of the experiment. 
+#12 samples from 3 cell lines and 4 repeats each
+phenotype <- factor(c(rep(c(rep("shNT", 4), rep("shA", 4), rep("shE",4)),3),
+                      rep(c(rep("shNT", 4), rep("shB", 4), rep("shC",4)),3)),
+                    levels = c( "shA", "shE", "shB", "shC", "shNT"))
+batch <- factor(c(rep('AE',36),rep("BC",36)))
+cellline <- factor(c(rep("4121", 12), rep("3832", 12), rep("3691",12),
+                     rep("3832", 12), rep("3691", 12), rep("4121",12)),
+                   levels = c("3832", "3691", "4121"))
+
+TS <- factor(paste(batch , phenotype, cellline, 1:4, sep="."))
+design <-model.matrix(~ batch + cellline + phenotype )
+
+
+output.gct(es,filename =  "../data/piwil1")
+gct <- as.data.frame(read.gct("../data/piwil1.gct"))
+
+gct$Description <- NA
+gct$NAME <- rownames(gct)
+gct <- gct[,c(ncol(gct),ncol(gct) -1  ,1:(ncol(gct) -2))]
+colnames(gct)[3:ncol(gct)] <- as.vector(TS)
+
+if(file.exists("../data/named_piwil1.gct")){
+  file.remove("../data/named_piwil1.gct")
+}
+writeLines(c("#1.2",
+             paste(nrow(gct),
+                   ncol(gct) - 2, 
+                   sep = "\t")), 
+           "../data/named_piwil1.gct")
+
+write.table(gct,
+            file = "../data/named_piwil1.gct", 
+            sep = "\t",
+            quote = F, 
+            append = T,
+            row.names = F,
+            col.names = T)
+
+# mds Plot of the cell lines
+# cell lines are placed based on 
+# typical distances of the top log2 fold changes
+plotMDS(es, cex = .7,labels = TS)
+
+
+
+fit <- lmFit(es, design)
+fit <- eBayes(fit)
+
+
+all <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value),
+              topTable(fit, 
+                       coef = 8,
+                       sort.by = "p",
+                       number = "all", 
+                       lfc = 0,
+                       p.value = 1))
+
+all$logFC <- -all$logFC
+top <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value),
+              topTable(fit,
+                       coef = 8,
+                       sort.by = "p", 
+                       number = "all", 
+                       lfc = 0,
+                       p.value = .05))
+top$logFC <- -top$logFC
+
+
+write.table(all    ,
+            file = "../data/Piwil1_all_knockdown_differentially_expressed_transcripts.txt",
+            sep = "\t", 
+            row.names = F,
+            quote = T)
+
+write.table(top    ,
+            file = "../data/Piwil1_all_knockdown_top_pval05_differentially_expressed_transcripts.txt", 
+            sep = "\t",
+            row.names = F,
+            quote = T)
+
+write.table(aggregate(data =top[top$SYMBOL != "",c(2,5,8)], 
+                      . ~ SYMBOL,
+                      FUN = mean),
+            file = "../data/Crosstalker_Piwil1_all_knockdown_top_pval05_differentially_expressed_transcripts.txt", 
+            sep = "\t", 
+            row.names = F,
+            quote = T )
+
+ct_top <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value),
+                 topTable(fit,
+                          coef = 8,
+                          sort.by = "p",
+                          number = "all", 
+                          lfc = 1,
+                          p.value = .05))
+ct_top$logFC <- -ct_top$logFC
+write.table(aggregate(data =ct_top[ct_top$SYMBOL != "",c(2,5,8)], . ~ SYMBOL, FUN = mean),
+            file = "../data/Crosstalker_Piwil1_all_knockdown_top_pval05_LFC_1_differentially_expressed_transcripts.txt", 
+            sep = "\t", 
+            row.names = F, 
+            quote = T )
+
+
+
+#the design of the experiment. 
+#12 samples from 3 cell lines and 4 repeats each
+phenotype <- factor(c(rep(c(rep("shNT", 4), rep("shA", 4), rep("shE",4)),3),
+                      rep(c(rep("shNT", 4), rep("shB", 4), rep("shC",4)),3)),
+                    levels = c("shNT", "shA", "shE", "shB", "shC"))
+
+design <-model.matrix(~ batch + cellline + phenotype )
+fit <- lmFit(es, design)
+fit <- eBayes(fit)
+results <- decideTests(fit)
+
+pdf("../figures/PIWIL1_venndiagram.pdf", 12,12)
+vennDiagram(results[,c(5:8)], include = c("up","down"))
+dev.off()
+
+top <- subset(select = -c(CHROMOSOME,
+                          ILMN_GENE,
+                          SEARCH_KEY, 
+                          Status, 
+                          P.Value),
+              topTable(fit,
+                       coef = 6,
+                       sort.by = "p", 
+                       number = "all",
+                       lfc = 0,
+                       p.value = 0.05))
+
+
+
+
+
+
+#probeID <- rownames(results)
+
+#data.frame(Gene=unlist(mget(x = probeID,envir = illuminaHumanv4SYMBOL)))
+
+
+#conrasts
+
+
+es <- createExpressionSet("../Experiments/All_PIWIL1/")
+
+
+ #thedesign of the experiment. 
+#12 samples from 3 cell lines and 4 repeats each
+phenotype <- factor(c(rep(c(rep( "NT", 4), rep( "A", 4), rep( "E",4)),3),
+                      rep(c(rep( "NT", 4), rep( "B", 4), rep( "C",4)),3)),
+                    levels = c( "NT", "A", "E", "B", "C"))
+batch <- factor(c(rep('AE',36),rep("BC",36)))
+cellline <- factor(c(rep("4121", 12), rep("3832", 12), rep("3691",12),
+                     rep("3832", 12), rep("3691", 12), rep("4121",12)),
+                   levels = c("3832", "3691", "4121"))
+
+sh <- factor(paste(batch,cellline,phenotype, sep="."))
+
+#design <-model.matrix(~ 0+ batch + cellline + phenotype )
+design <- model.matrix(~0+ sh)
+colnames(design) <- gsub(colnames(design),
+                         pattern = "sh",
+                         replacement = "")
+
+
+fit <- lmFit(es, design)
+
+contrasts <- makeContrasts(
+  NTvT =(  (AE.3691.A-AE.3691.NT + AE.3691.E-AE.3691.NT + BC.3691.B-BC.3691.NT + BC.3691.C-BC.3691.NT) + 
+           (AE.3832.A-AE.3832.NT + AE.3832.E-AE.3832.NT + BC.3832.B-BC.3832.NT + BC.3832.C-BC.3832.NT) + 
+           (AE.4121.A-AE.4121.NT + AE.4121.E-AE.4121.NT + BC.4121.B-BC.4121.NT + BC.4121.C-BC.4121.NT)),
+  levels = design
+)
+
+contrasts <- makeContrasts(
+  NTvT =(  (sh3691.A-sh3691.NT + sh3691.E-sh3691.NT + sh3691.B-sh3691.NT + sh3691.C-sh3691.NT)/4 +
+           (sh3832.A-sh3832.NT + sh3832.E-sh3832.NT + sh3832.B-sh3832.NT + sh3832.C-sh3832.NT)/4 + 
+           (sh4121.A-sh4121.NT + sh4121.E-sh4121.NT + sh4121.B-sh4121.NT + sh4121.C-sh4121.NT)/4)/3,
+  levels = design
+)
+
+
+
+fit2 <- contrasts.fit(fit,contrasts)
+fit2 <- eBayes(fit2)
+
+all <- subset(select = -c(CHROMOSOME,
+                          ILMN_GENE,
+                          SEARCH_KEY, 
+                          Status, 
+                          P.Value),
+              topTable(fit2, 
+                       coef = 1,
+                       sort.by = "p",
+                       number = "all", 
+                       lfc = 0, 
+                       p.value = 1))
+
+top <- subset(select = -c(CHROMOSOME,
+                          ILMN_GENE,
+                          SEARCH_KEY, 
+                          Status, 
+                          P.Value),
+              topTable(fit2,
+                       coef = 1,
+                       sort.by = "p",
+                       number = "all",
+                       lfc = 0, 
+                       p.value = .05))
+
+```
+
+
+
+```{r Piwil1_knockdown_AE}
+
+
+
+es <- createExpressionSet("../Experiments/PIWIL1_AE/")
+
+ #thedesign of the experiment. 
+#12 samples from 3 cell lines and 4 repeats each
+phenotype <- factor(rep(c(rep("shNT", 4), rep("shA", 4), rep("shE",4)),3), levels = c("shNT", "shA", "shE"))
+cellline <- factor(c(rep("3832", 12), rep("3691", 12), rep("4121",12)) , levels = c("3832", "3691", "4121"))
+
+TS <- factor(paste(phenotype, cellline, sep="."))
+design <-model.matrix(~ cellline + phenotype )
+
+
+#mds Plot of the cell lines
+#cell lines are placed based on typical distances of the top log2 fold changes
+plotMDS(es, cex = .7,labels = TS)
+
+
+
+fit <- lmFit(es, design)
+fit <- eBayes(fit)
+
+
+#Knockdown E
+
+all <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value),
+              topTable(fit, 
+                       coef = 5,
+                       sort.by = "p", 
+                       number = "all",
+                       lfc = 0,
+                       p.value = 1)
+              )
+top <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value),
+              topTable(fit,
+                       coef = 5,
+                       sort.by = "p", 
+                       number = "all",
+                       lfc = 0,
+                       p.value = .05)
+              )
+
+write.table(all    , 
+            file = "../data/Piwil1_knockdown_E_differentially_expressed_transcripts.txt",
+            sep = "\t",
+            row.names = F, 
+            quote = T)
+write.table(top    , 
+            file = "../data/Piwil1_knockdown_E_top_pval05_differentially_expressed_transcripts.txt",
+            sep = "\t", 
+            row.names = F,
+            quote = T)
+write.table(aggregate(data =top[top$SYMBOL != "",c(2,5,8)], 
+                      . ~ SYMBOL,
+                      FUN = mean),
+            file = "../data/Crosstalker_Piwil1_knockdown_E_top_pval05_differentially_expressed_transcripts.txt", 
+            sep = "\t",
+            row.names = F,
+            quote = T)
+
+#top <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value),topTable(fit, coef = 5,sort.by = "p", number = "all", lfc = 1, p.value = .05))
+#write.table(top    , "../data/Piwil1_knockdown_E_top_pval05_LFC_1_differentially_expressed_transcripts.txt", sep = "\t", row.names = F, quote = T)
+
+#Knockdown A
+
+all <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value),
+              topTable(fit, 
+                       coef = 4, 
+                       sort.by = "p", 
+                       number = "all", 
+                       lfc = 0, 
+                       p.value = 1))
+top <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value),
+              topTable(fit, 
+                       coef = 4,
+                       sort.by = "p",
+                       number = "all", 
+                       lfc = 0, 
+                       p.value = .05)
+              )
+
+write.table(all    ,
+            file ="../data/Piwil1_knockdown_A_differentially_expressed_transcripts.txt",
+            sep = "\t",
+            row.names = F, 
+            quote = T)
+write.table(top    ,
+            file = "../data/Piwil1_knockdown_A_top_pval05_differentially_expressed_transcripts.txt",
+            sep = "\t", 
+            row.names = F,
+            quote = T)
+write.table(aggregate(data =top[top$SYMBOL != "",c(2,5,8)], 
+                      . ~ SYMBOL, 
+                      FUN = mean),
+            file = "../data/Crosstalker_Piwil1_knockdown_A_top_pval05_differentially_expressed_transcripts.txt", 
+            sep = "\t",
+            row.names = F,
+            quote = T)
+
+
+
+# Doesn't do anything as of now
+# for creating a venn diagram
+results <- decideTests(fit)
+vennDiagram(results[,c(4,5)],
+            include = c("up","down"))
+probeID <- rownames(results)
+#data.frame(Gene=unlist(mget(x = probeID,envir = illuminaHumanv4SYMBOL)))
+
+```
+
+
+
+```{r all_BC}
+
+es <- createExpressionSet("../Experiments/PIWIL1_BC/")
+
+
+ #thedesign of the experiment. 
+#12 samples from 3 cell lines and 4 repeats each
+phenotype <- factor(rep(c(rep("shNT", 4), rep("shB", 4), rep("shC",4)),3), levels = c("shNT", "shB", "shC"))
+cellline <- factor(c(rep("3832", 12), rep("3691", 12), rep("4121",12)) , levels = c("3832", "3691", "4121"))
+
+TS <- factor(paste(phenotype, cellline, sep="."))
+design <-model.matrix(~ cellline + phenotype )
+
+
+#mds Plot of the cell lines
+#cell lines are placed based on typical distances of the top log2 fold changes
+plotMDS(es, 
+        cex = .7,
+        labels = TS)
+fit <- eBayes(lmFit(es, design))
+all <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value),
+              topTable(fit,
+                       coef = 5,
+                       sort.by = "p", 
+                       number = "all", 
+                       lfc = 0, 
+                       p.value = 1)
+              )
+
+top <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value),
+              topTable(fit,
+                       coef = 5,
+                       sort.by = "p", 
+                       number = "all",
+                       lfc = 0,
+                       p.value = .05))
+write.table(all    ,
+            file =  "../data/Piwil1_knockdown_C_differentially_expressed_transcripts.txt", 
+            sep = "\t",
+            row.names = F,
+            quote = T)
+write.table(top    ,
+            file = "../data/Piwil1_knockdown_C_top_pval05_differentially_expressed_transcripts.txt",
+            sep = "\t",
+            row.names = F,
+            quote = T)
+all <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value),
+              x = topTable(fit, 
+                           coef = 4, 
+                           sort.by = "p",
+                           number = "all", 
+                           lfc = 0, 
+                           p.value = 1)
+              )
+top <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value),
+              x = topTable(fit,
+                           coef = 4,
+                           sort.by = "p", 
+                           number = "all",
+                           lfc = 0, 
+                           p.value = .05)
+              )
+write.table(all    ,
+            file =  "../data/Piwil1_knockdown_B_differentially_expressed_transcripts.txt", 
+            sep = "\t",
+            row.names = F,
+            quote = T)
+write.table(top    ,
+            file = "../data/Piwil1_knockdown_B_top_pval05_differentially_expressed_transcripts.txt",
+            sep = "\t",
+            row.names = F, 
+            quote = T)
+
+
+```
+
+
+
+```{r all_HI}
+
+es <- createExpressionSet("../Experiments/PIWIL2_HI/")
+
+
+ #thedesign of the experiment. 
+#12 samples from 3 cell lines and 4 repeats each
+phenotype <- factor(rep(c(rep("shNT", 4), rep("shH", 4), rep("shI",4)),3), levels = c("shNT", "shH", "shI"))
+cellline <- factor(c(rep("4121", 12), rep("387", 12), rep("3359",12)) , levels = c("4121", "387", "3359"))
+
+TS <- factor(paste(phenotype, cellline, sep="."))
+design <-model.matrix(~ cellline + phenotype )
+
+
+#mds Plot of the cell lines
+#cell lines are placed based on typical distances of the top log2 fold changes
+plotMDS(es, cex = .7,labels = TS)
+fit <- lmFit(es, design)
+fit <- eBayes(fit)
+all <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value),
+              x = topTable(fit, coef = 5,sort.by = "p", number = "all", lfc = 0, p.value = 1))
+top <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value), 
+              x = topTable(fit, 
+                           coef = 5,
+                           sort.by = "p",
+                           number = "all", 
+                           lfc = 0, 
+                           p.value = .05)
+              )
+write.table(all    ,
+            file = "../data/Piwil2_knockdown_I_differentially_expressed_transcripts.txt",
+            sep = "\t",
+            row.names = F, 
+            quote = F)
+write.table(top    , 
+            file = "../data/Piwil2_knockdown_I_top_pval05_differentially_expressed_transcripts.txt", 
+            sep = "\t", 
+            row.names = F, 
+            quote = F)
+all <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value),
+              x =topTable(fit,
+                             coef = 4, 
+                             sort.by = "p",
+                             number = "all",
+                             lfc = 0,
+                             p.value = 1)
+              )
+top <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value), 
+              x = topTable(fit, 
+                           coef = 4,
+                           sort.by = "p",
+                           number = "all", 
+                           lfc = 0, 
+                           p.value = .05)
+              )
+write.table(all    ,
+            file = "../data/Piwil2_knockdown_H_differentially_expressed_transcripts.txt",
+            sep = "\t",
+            row.names = F,
+            quote = F)
+write.table(top    ,
+            file =  "../data/Piwil2_knockdown_H_top_pval05_differentially_expressed_transcripts.txt", 
+            sep = "\t", 
+            row.names = F,
+            quote = F)
+
+
+```
+
+
+
+
+
+```{r individual_samples}
+
+# calculate and write the expressions for an individual experiment
+IndividualExpressions <- function(expression_set_path, output_dir = "../data/individual_samples_expressions/", cell_prefix, experiment_prefix, coeficient , design ){
+  
+  # load the expression set data 
+  es <- createExpressionSet(expression_set_path) 
+  # mds Plot of the cell lines
+  # cell lines are placed based on typical distances of the top log2 fold changes
+  plotMDS(x = es, 
+          cex = .7, 
+          labels = phenotype)
+  fit <- eBayes(lmFit(es, design))
+  # compute expressions of all gene probes
+  all <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value),
+                x = topTable(fit,
+                             coef = coeficient,
+                             sort.by = "p",
+                             number = "all", 
+                             lfc = 0, 
+                             p.value = 1)
+  )
+  # compute the top gene probes by selected p value
+  top <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value),
+                x = topTable(fit,
+                             coef = coeficient,
+                             sort.by = "p", 
+                             number = "all", 
+                             lfc = 0,
+                             p.value = .05)
+  )
+  write.table(x = all,
+              file = paste0(output_dir,paste(cell_prefix,  experiment_prefix, "differentially_expressed_transcripts.txt", sep = "_")),
+              sep = "\t",
+              row.names = F,
+              quote = F)
+  write.table(x = top, 
+              file = paste0(output_dir, paste(cell_prefix,  experiment_prefix, "top_pval05_differentially_expressed_transcripts.txt", sep = "_")),
+              sep = "\t",
+              row.names = F,
+              quote = F)
+}
+
+# the design of the experiment. 
+# 12 samples from 3 cell lines and 4 repeats each
+phenotype <-
+  factor(
+    c(rep("shNT", 4), 
+      rep("shA", 4), 
+      rep("shE",4)),
+    levels = c("shNT", "shA", "shE")
+  )
+design <-model.matrix(~  phenotype )
+
+IndividualExpressions(expression_set_path = "../Experiments/Cell_Line_3691_AE/", cell_prefix = "Piwil1_3691", experiment_prefix = "knockdown_A", coeficient = 2, design = design)
+IndividualExpressions(expression_set_path = "../Experiments/Cell_Line_3691_AE/", cell_prefix = "Piwil1_3691", experiment_prefix = "knockdown_E", coeficient = 3, design = design)
+IndividualExpressions(expression_set_path = "../Experiments/Cell_Line_3832_AE/", cell_prefix = "Piwil1_3832", experiment_prefix = "knockdown_A", coeficient = 2, design = design)
+IndividualExpressions(expression_set_path = "../Experiments/Cell_Line_3832_AE/", cell_prefix = "Piwil1_3832", experiment_prefix = "knockdown_E", coeficient = 3, design = design)
+IndividualExpressions(expression_set_path = "../Experiments/Cell_Line_4121_AE/", cell_prefix = "Piwil1_4121", experiment_prefix = "knockdown_A", coeficient = 2, design = design)
+IndividualExpressions(expression_set_path = "../Experiments/Cell_Line_4121_AE/", cell_prefix = "Piwil1_4121", experiment_prefix = "knockdown_E", coeficient = 3, design = design)
+
+phenotype <- 
+  factor(
+    c(rep("shNT", 4), 
+      rep("shB", 4), 
+      rep("shC",4)),
+    levels = c("shNT", "shB", "shC")
+  )
+design <-model.matrix(~  phenotype )
+
+IndividualExpressions(expression_set_path = "../Experiments/Cell_Line_3691_BC/", cell_prefix = "Piwil1_3691", experiment_prefix = "knockdown_B", coeficient = 2, design = design)
+IndividualExpressions(expression_set_path = "../Experiments/Cell_Line_3691_BC/", cell_prefix = "Piwil1_3691", experiment_prefix = "knockdown_C", coeficient = 3, design = design)
+IndividualExpressions(expression_set_path = "../Experiments/Cell_Line_3832_BC/", cell_prefix = "Piwil1_3832", experiment_prefix = "knockdown_B", coeficient = 2, design = design)
+IndividualExpressions(expression_set_path = "../Experiments/Cell_Line_3832_BC/", cell_prefix = "Piwil1_3832", experiment_prefix = "knockdown_C", coeficient = 3, design = design)
+IndividualExpressions(expression_set_path = "../Experiments/Cell_Line_4121_BC/", cell_prefix = "Piwil1_4121", experiment_prefix = "knockdown_B", coeficient = 2, design = design)
+IndividualExpressions(expression_set_path = "../Experiments/Cell_Line_4121_BC/", cell_prefix = "Piwil1_4121", experiment_prefix = "knockdown_C", coeficient = 3, design = design)
+
+
+phenotype <-
+  factor(c(rep("shNT", 4),
+           rep("shH", 4),
+           rep("shI",4)),
+         levels = c("shNT", "shH", "shI")
+  )
+design <-model.matrix(~  phenotype )
+
+IndividualExpressions(expression_set_path = "../Experiments/Cell_Line_387_HI/", cell_prefix = "Piwil1_387", experiment_prefix = "knockdown_H", coeficient = 2, design = design)
+IndividualExpressions(expression_set_path = "../Experiments/Cell_Line_387_HI/", cell_prefix = "Piwil1_387", experiment_prefix = "knockdown_I", coeficient = 3, design = design)
+IndividualExpressions(expression_set_path = "../Experiments/Cell_Line_3359_HI/", cell_prefix = "Piwil1_3359", experiment_prefix = "knockdown_H", coeficient = 2, design = design)
+IndividualExpressions(expression_set_path = "../Experiments/Cell_Line_3359_HI/", cell_prefix = "Piwil1_3359", experiment_prefix = "knockdown_I", coeficient = 3, design = design)
+IndividualExpressions(expression_set_path = "../Experiments/Cell_Line_4121_HI/", cell_prefix = "Piwil1_4121", experiment_prefix = "knockdown_H", coeficient = 2, design = design)
+IndividualExpressions(expression_set_path = "../Experiments/Cell_Line_4121_HI/", cell_prefix = "Piwil1_4121", experiment_prefix = "knockdown_I", coeficient = 3, design = design)
+
+
+
+```
+
+
