@@ -246,13 +246,13 @@ design <- model.matrix(~ celltype)
 # reads with low counts be removed
 # converting to DGEList
 # removing low count genes
+# normalization
 dge_counts <- 
   read.counts[rowSums(cpm(read.counts) >= 1) >= 2,] %>%
-  DGEList()
+  DGEList() %>%
+  calcNormFactors(method = c("TMM"))
 
-# normalization
-dge_counts <- calcNormFactors(dge_counts, 
-                              method = c("TMM"))
+
 
 # voom for creating converting RNA seq reads to microaray data for the pipeline
 voom_counts <-voom(counts = dge_counts, 
@@ -272,7 +272,8 @@ plotMDS(x = dge_counts,
 fit <- 
   eBayes(
     lmFit(object = voom_counts,
-          design = design))
+          design = design)
+  )
 
 #voom fold changes and p values for all genes
 voom_all_genes <- topTable(fit = fit, 
@@ -304,7 +305,7 @@ write.table(x = voom_all_HGNC,
             sep = ",",
             row.names = F)
 write.table(x = voom_top_HGNC, 
-            file = "../data/GSC_vs_HNPC_top_pval05_differentially_expressed_genes.csv",
+            file = "../../data_files/RNAseq_expressed_genes/GSC_vs_HNPC_top_pval05_differentially_expressed_genes.csv",
             quote = FALSE, 
             sep = ",",
             row.names = F)
@@ -334,7 +335,7 @@ data("exampleRanks")
 fgseaRes <- fgsea(pathways = pathways,stats = ranks, nperm = 10000, maxSize = 500)
 
 
-pdf("../GSEA/GSC_vs_HNPC_gsea.pdf", 14,8)
+pdf("../../data_files/GSEA/GSC_vs_HNPC_gsea.pdf", 14,8)
 topPathwaysUp <- fgseaRes[ES > 0][head(order(pval), n=10), pathway]
 topPathwaysDown <- fgseaRes[ES < 0][head(order(pval), n=10), pathway]
 topPathways <- c(topPathwaysUp, rev(topPathwaysDown))
@@ -355,11 +356,16 @@ dev.off()
 
 ```{r RSEM}
 #read in the RSEM counts
-read.counts <- read.table("../RSEM_out/rsem_isoforms_matrix.txt")
+read.counts <- read.table("../../data_files/RSEM_out/rsem_isoforms_matrix.txt")
 
 
 #change column names to the samples names form the data
-colnames(read.counts) <- c("387++","456++","3359++","3691++","3832++","4121++","4302++","H2S++","387-","456-", "3359-","3691-","3832-","4121-","4302-","H2S-", "1123++", "528++", "1123-", "528-", "hNP1_old","hNP1_new","17231","16157")
+colnames(read.counts) <- c("387++","456++","3359++","3691++","3832++","4121++","4302++","H2S++",
+                           "387-","456-", "3359-","3691-","3832-","4121-","4302-","H2S-",
+                           "1123++", "528++", 
+                           "1123-", "528-", 
+                           "hNP1_old","hNP1_new",
+                           "17231","16157")
 read.counts <- subset(read.counts,
                       select = -c(`1123++`, `528++`, 
                                   `1123-`,`528-`, 
@@ -404,7 +410,8 @@ plotMDS(x = dge_counts,
 fit <-
   eBayes(
     lmFit(object = voom_counts,
-        design = design))
+        design = design)
+  )
 
 # voom fold changes and p values for all genes
 voom_all <- topTable(fit = fit, 
@@ -423,6 +430,11 @@ voom_top <- topTable(fit = fit,
 # name conversion to HGNC symbols
 # TODO clean up name conversions
 voom_top$transcript_id <- rownames(voom_top)
+conversion <- read.table(file = "../../conversion_sets/ensembl_conversion.txt",
+                         stringsAsFactors = F, 
+                         sep = "\t",
+                         header = T)
+
 voom_top_HGNC <- merge(x = voom_top, 
                        y = conversion[,c(2,3)], 
                        by = "transcript_id")
@@ -434,12 +446,12 @@ voom_all_HGNC <- merge(x = voom_all,
 
 # write the differently expressed transcripts to file
 write.table(x = voom_all_HGNC,
-            file = "../data/GSC_vs_nonGSC_all_differentially_expressed_transcripts.csv",
+            file = "../../data_files/RNAseq_expressed_genes/GSC_vs_nonGSC_all_differentially_expressed_transcripts.csv",
             quote = FALSE, 
             sep = ",",
             row.names = F)
 write.table(x = voom_top_HGNC, 
-            file = "../data/GSC_vs_nonGSC_top_pval05_differentially_expressed_transcripts.csv",
+            file = "../../data_files/RNAseq_expressed_genes/GSC_vs_nonGSC_top_pval05_differentially_expressed_transcripts.csv",
             quote = FALSE, 
             sep = ",",
             row.names = F)
@@ -457,7 +469,7 @@ write.table(x = voom_top_HGNC,
 ```{r SRP040525}
 
 #load in the star counts
-read.counts <- importStarCounts(folder = "../SRP040525_counts/", 
+read.counts <- importStarCounts(folder = "../../data_files/SRP040525_gene_counts/", 
                                 column = 4)
 # remove unnecessary name data
 colnames(read.counts) <- gsub(pattern = "ReadsPerGene.out.tab", "", colnames(read.counts))
