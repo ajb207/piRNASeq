@@ -47,13 +47,13 @@ removeRepeats <- function(read_counts){
 
 
 #import the desired read counts
-read_counts <- read.delim("../sRNA_counts/small_sa_og_norRNA_25_33_counts.txt", sep=",", stringsAsFactors=FALSE, row.names = 1)
+read_counts <- read.delim("../../data_files/sRNA_counts/small_sa_og_norRNA_25_33_counts.txt", sep=",", stringsAsFactors=FALSE, row.names = 1)
 
-rRNA <- read.table(file = "../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt", 
+rRNA <- read.table(file = "../../data_files/stem_diff_alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt", 
                    header = FALSE, 
                    stringsAsFactors = FALSE)
 read_counts <- read_counts[!(rownames(read_counts) %in% rRNA$V1),]
-YRNA <- read.table(file = "../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_YRNA.txt", 
+YRNA <- read.table(file = "../../data_files/stem_diff_alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_YRNA.txt", 
                    header = FALSE, 
                    stringsAsFactors = FALSE)
 read_counts <- read_counts[!(rownames(read_counts) %in% YRNA$V1),]

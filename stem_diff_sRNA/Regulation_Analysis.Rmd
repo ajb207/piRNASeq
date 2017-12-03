@@ -450,7 +450,8 @@ for(alignments_number in 1:length(cDNA_alignments)){
 ```{r promotor_alignments, echo = FALSE}
 
 #conversion table for converting RefSeq ids to HGNC gene symbols
-conversion <- read.delim("../../conversion_sets/hgnc_to_refseq.txt", stringsAsFactors=FALSE, sep = "\t")
+conversion <- read.delim(file = "../../conversion_sets/hgnc_to_refseq.txt",
+                         stringsAsFactors=FALSE, sep = "\t")
 colnames(conversion) <- c("hgnc_symbol", "refseq_id")
 
 
@@ -533,8 +534,9 @@ for(alignments_number in 1:length(promoter_alignments)){
   pdf(paste("../../figures/promoter_coexpression_",name ,".pdf"), 6,4)
   print(
     #plot of the correlatiosn between expression data
-    ggplot(data = coexpression, aes(y = gene_logFC, 
-                                    x = piRNA_logFC)) +
+    ggplot(data = coexpression, 
+           aes(y = gene_logFC, 
+               x = piRNA_logFC)) +
       # geom_rect(aes(xmin = 2, xmax =ceiling(max(coexpression$piRNA_logFC)), ymax = -2, ymin = floor(min(coexpression$gene_logFC))), fill = "white", color = "blue", alpha = 1/20000, size = .7) + 
       #geom_rect(aes(xmax = -2, xmin = floor(min(coexpression$piRNA_logFC)), ymin = 2, ymax = ceiling(max(coexpression$gene_logFC))),fill = "white", color = "blue", alpha = 1/20000, size = .7) + 
       geom_point(aes(color = gene_pval, 
