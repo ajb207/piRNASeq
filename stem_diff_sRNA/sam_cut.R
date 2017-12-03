@@ -115,8 +115,8 @@ system("grep -f ../data/temp_read_names.txt ../alignments/list_targeting/small_s
 system("grep -f ../data/temp_read_names.txt ../alignments/list_targeting/small_sa_og_norRNA_25_33_25bp_targeting_cDNA_bt2v1score2_trimmed.txt > ../data/cDNA_temp_alignments_bt2v1score2.txt" )
 system("grep -f ../data/temp_read_names.txt ../alignments/list_targeting/small_sa_og_norRNA_25_33_25bp_targeting_cDNA_bt2v1score4_trimmed.txt > ../data/cDNA_temp_alignments_bt2v1score4.txt" )
 system("grep -f ../data/temp_read_names.txt ../alignments/list_targeting/small_sa_og_norRNA_25_33_25bp_targeting_cDNA_bt2v1score6_trimmed.txt > ../data/cDNA_temp_alignments_bt2v1score6.txt" )
-system("grep -f ../data/temp_read_names.txt ../alignments/list_targeting/DE_targeting_cDNA_bt2v1score8.sam | cut -f 1,3,4,6,19 >  ../data/cDNA_temp_alignments_bt2v1score8.txt" )
-system("grep -f ../data/temp_read_names.txt ../alignments/list_targeting/DE_targeting_cDNA_bt2v1score10.sam | cut -f 1,3,4,6,19 >  ../data/cDNA_temp_alignments_bt2v1score10.txt" )
+#system("grep -f ../data/temp_read_names.txt ../alignments/list_targeting/DE_targeting_cDNA_bt2v1score8.sam | cut -f 1,3,4,6,19 >  ../data/cDNA_temp_alignments_bt2v1score8.txt" )
+#system("grep -f ../data/temp_read_names.txt ../alignments/list_targeting/DE_targeting_cDNA_bt2v1score10.sam | cut -f 1,3,4,6,19 >  ../data/cDNA_temp_alignments_bt2v1score10.txt" )
 
 
 system("grep -f ../data/temp_read_names.txt ../alignments/list_targeting/small_sa_og_norRNA_25_33_25bp_targeting_3UTR_bt2v1score2_trimmed.txt > ../data/3UTR_temp_alignments_bt2v1score2.txt" )
