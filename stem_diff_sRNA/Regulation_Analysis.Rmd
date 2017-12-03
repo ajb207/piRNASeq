@@ -150,7 +150,7 @@ for(alignments_number in 1:length(UTR_alignments)){
   
   
   write.table(x = coexpression,
-              file =  paste("../data/3UTR_coexpression_", name ,".csv"),
+              file =  paste("../../data_files/coexpressions/3UTR_coexpression_", name ,".csv"),
               quote = F,
               sep = ",",
               row.names = F)
@@ -379,11 +379,16 @@ for(alignments_number in 1:length(cDNA_alignments)){
                                by.x = "sRNA", by.y = "piRNA"))
   colnames(coexpression)[1:3] <- c("piRNA", "piRNA_logFC", "piRNA_pval")
   coexpression <-merge(coexpression,
-                       subset(gene_expression, select = c(transcript_id, logFC, adj.P.Val)),
+                       subset(x = gene_expression,
+                              select = c(transcript_id, logFC, adj.P.Val)),
                        by = "transcript_id")
   colnames(coexpression)[6:7] <- c( "gene_logFC", "gene_pval")
   
- write.table(coexpression, paste("../../data_files/coexpressions/cDNA_coexpression_", name ,".csv"), quote = F, sep = ",",row.names = F)
+ write.table(x = coexpression, 
+             file = paste("../../data_files/coexpressions/cDNA_coexpression_", name ,".csv"),
+             quote = F, 
+             sep = ",",
+             row.names = F)
   
   pdf(paste("../../figures/cDNA_coexpression_",name ,".pdf"), 6,4)
   print(
