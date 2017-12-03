@@ -234,8 +234,7 @@ all <-
                      ILMN_GENE,
                      SEARCH_KEY, 
                      Status, 
-                     P.Value)
-  )
+                     P.Value))
 
 top <- 
   topTable(fit2,
@@ -248,8 +247,7 @@ top <-
                      ILMN_GENE,
                      SEARCH_KEY, 
                      Status, 
-                     P.Value)
-  )
+                     P.Value))
 
 ```
 
@@ -259,7 +257,7 @@ top <-
 
 
 
-es <- createExpressionSet("../Experiments/PIWIL1_AE/")
+es <- createExpressionSet("../../data_files/illumina_studio_output/PIWIL1_AE/")
 
  #thedesign of the experiment. 
 #12 samples from 3 cell lines and 4 repeats each
@@ -282,37 +280,38 @@ fit <- eBayes(fit)
 
 #Knockdown E
 
-all <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value),
-              topTable(fit, 
-                       coef = 5,
-                       sort.by = "p", 
-                       number = "all",
-                       lfc = 0,
-                       p.value = 1)
-              )
-top <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value),
-              topTable(fit,
-                       coef = 5,
-                       sort.by = "p", 
-                       number = "all",
-                       lfc = 0,
-                       p.value = .05)
-              )
+all <- 
+  topTable(fit = fit, 
+           coef = 5,
+           sort.by = "p", 
+           number = "all",
+           lfc = 0,
+           p.value = 1) %>% 
+  subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value))
+
+top <-
+  topTable(fit = fit,
+           coef = 5,
+           sort.by = "p", 
+           number = "all",
+           lfc = 0,
+           p.value = .05) %>%
+  subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value))
 
 write.table(all    , 
-            file = "../data/Piwil1_knockdown_E_differentially_expressed_transcripts.txt",
+            file = "../../data_files/microarray_expressed_genes/Piwil1_knockdown_E_differentially_expressed_transcripts.txt",
             sep = "\t",
             row.names = F, 
             quote = T)
 write.table(top    , 
-            file = "../data/Piwil1_knockdown_E_top_pval05_differentially_expressed_transcripts.txt",
+            file = "../../data_files/microarray_expressed_genes/Piwil1_knockdown_E_top_pval05_differentially_expressed_transcripts.txt",
             sep = "\t", 
             row.names = F,
             quote = T)
 write.table(aggregate(data =top[top$SYMBOL != "",c(2,5,8)], 
                       . ~ SYMBOL,
                       FUN = mean),
-            file = "../data/Crosstalker_Piwil1_knockdown_E_top_pval05_differentially_expressed_transcripts.txt", 
+            file = "../../data_files/microarray_expressed_genes/Crosstalker_Piwil1_knockdown_E_top_pval05_differentially_expressed_transcripts.txt", 
             sep = "\t",
             row.names = F,
             quote = T)
@@ -322,36 +321,38 @@ write.table(aggregate(data =top[top$SYMBOL != "",c(2,5,8)],
 
 #Knockdown A
 
-all <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value),
-              topTable(fit, 
-                       coef = 4, 
-                       sort.by = "p", 
-                       number = "all", 
-                       lfc = 0, 
-                       p.value = 1))
-top <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value),
-              topTable(fit, 
-                       coef = 4,
-                       sort.by = "p",
-                       number = "all", 
-                       lfc = 0, 
-                       p.value = .05)
-              )
+all <- 
+  topTable(fit = fit, 
+           coef = 4, 
+           sort.by = "p", 
+           number = "all", 
+           lfc = 0, 
+           p.value = 1) %>%
+  subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value))
+
+top <-
+  topTable(fit, 
+           coef = 4,
+           sort.by = "p",
+           number = "all", 
+           lfc = 0, 
+           p.value = .05) %>%
+  subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value))
 
 write.table(all    ,
-            file ="../data/Piwil1_knockdown_A_differentially_expressed_transcripts.txt",
+            file ="../../data_files/microarray_expressed_genes/Piwil1_knockdown_A_differentially_expressed_transcripts.txt",
             sep = "\t",
             row.names = F, 
             quote = T)
 write.table(top    ,
-            file = "../data/Piwil1_knockdown_A_top_pval05_differentially_expressed_transcripts.txt",
+            file = "../../data_files/microarray_expressed_genes/Piwil1_knockdown_A_top_pval05_differentially_expressed_transcripts.txt",
             sep = "\t", 
             row.names = F,
             quote = T)
 write.table(aggregate(data =top[top$SYMBOL != "",c(2,5,8)], 
                       . ~ SYMBOL, 
                       FUN = mean),
-            file = "../data/Crosstalker_Piwil1_knockdown_A_top_pval05_differentially_expressed_transcripts.txt", 
+            file = "../../data_files/microarray_expressed_genes/Crosstalker_Piwil1_knockdown_A_top_pval05_differentially_expressed_transcripts.txt", 
             sep = "\t",
             row.names = F,
             quote = T)
@@ -372,7 +373,7 @@ probeID <- rownames(results)
 
 ```{r all_BC}
 
-es <- createExpressionSet("../Experiments/PIWIL1_BC/")
+es <- createExpressionSet("../../data_files/illumina_studio_output/PIWIL1_BC/")
 
 
  #thedesign of the experiment. 
@@ -389,30 +390,36 @@ design <-model.matrix(~ cellline + phenotype )
 plotMDS(es, 
         cex = .7,
         labels = TS)
-fit <- eBayes(lmFit(es, design))
-all <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value),
-              topTable(fit,
-                       coef = 5,
-                       sort.by = "p", 
-                       number = "all", 
-                       lfc = 0, 
-                       p.value = 1)
-              )
 
-top <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value),
-              topTable(fit,
-                       coef = 5,
-                       sort.by = "p", 
-                       number = "all",
-                       lfc = 0,
-                       p.value = .05))
-write.table(all    ,
-            file =  "../data/Piwil1_knockdown_C_differentially_expressed_transcripts.txt", 
+fit <-
+  eBayes(
+    lmFit(object = es,
+          design =  design))
+all <- topTable(fit = fit,
+                coef = 5,
+                sort.by = "p", 
+                number = "all", 
+                lfc = 0, 
+                p.value = 1) %>%
+  subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value))
+
+
+top <- 
+  topTable(fit = fit,
+           coef = 5,
+           sort.by = "p", 
+           number = "all",
+           lfc = 0,
+           p.value = .05) %>%
+  subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value))
+
+write.table(x = all    ,
+            file =  "../../data_files/microarray_expressed_genes/Piwil1_knockdown_C_differentially_expressed_transcripts.txt", 
             sep = "\t",
             row.names = F,
             quote = T)
-write.table(top    ,
-            file = "../data/Piwil1_knockdown_C_top_pval05_differentially_expressed_transcripts.txt",
+write.table(x = top    ,
+            file = "../../data_files/microarray_expressed_genes/Piwil1_knockdown_C_top_pval05_differentially_expressed_transcripts.txt",
             sep = "\t",
             row.names = F,
             quote = T)
@@ -433,12 +440,12 @@ top <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value),
                            p.value = .05)
               )
 write.table(all    ,
-            file =  "../data/Piwil1_knockdown_B_differentially_expressed_transcripts.txt", 
+            file =  ".../../data_files/microarray_expressed_genes/Piwil1_knockdown_B_differentially_expressed_transcripts.txt", 
             sep = "\t",
             row.names = F,
             quote = T)
 write.table(top    ,
-            file = "../data/Piwil1_knockdown_B_top_pval05_differentially_expressed_transcripts.txt",
+            file = "../../data_files/microarray_expressed_genes/Piwil1_knockdown_B_top_pval05_differentially_expressed_transcripts.txt",
             sep = "\t",
             row.names = F, 
             quote = T)
@@ -450,7 +457,7 @@ write.table(top    ,
 
 ```{r all_HI}
 
-es <- createExpressionSet("../Experiments/PIWIL2_HI/")
+es <- createExpressionSet("../../data_files/illumina_studio_output/PIWIL2_HI/")
 
 
  #thedesign of the experiment. 
@@ -469,47 +476,50 @@ fit <- lmFit(es, design)
 fit <- eBayes(fit)
 all <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value),
               x = topTable(fit, coef = 5,sort.by = "p", number = "all", lfc = 0, p.value = 1))
-top <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value), 
-              x = topTable(fit, 
-                           coef = 5,
-                           sort.by = "p",
-                           number = "all", 
-                           lfc = 0, 
-                           p.value = .05)
-              )
-write.table(all    ,
-            file = "../data/Piwil2_knockdown_I_differentially_expressed_transcripts.txt",
+top <- 
+  topTable(fit = fit, 
+           coef = 5,
+           sort.by = "p",
+           number = "all", 
+           lfc = 0, 
+           p.value = .05) %>%
+  subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value))
+
+write.table(x = all    ,
+            file = "../../data_files/microarray_expressed_genes/Piwil2_knockdown_I_differentially_expressed_transcripts.txt",
             sep = "\t",
             row.names = F, 
             quote = F)
-write.table(top    , 
-            file = "../data/Piwil2_knockdown_I_top_pval05_differentially_expressed_transcripts.txt", 
+write.table(x = top    , 
+            file = "../../data_files/microarray_expressed_genes/Piwil2_knockdown_I_top_pval05_differentially_expressed_transcripts.txt", 
             sep = "\t", 
             row.names = F, 
             quote = F)
-all <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value),
-              x =topTable(fit,
-                             coef = 4, 
-                             sort.by = "p",
-                             number = "all",
-                             lfc = 0,
-                             p.value = 1)
-              )
-top <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value), 
-              x = topTable(fit, 
-                           coef = 4,
-                           sort.by = "p",
-                           number = "all", 
-                           lfc = 0, 
-                           p.value = .05)
-              )
-write.table(all    ,
-            file = "../data/Piwil2_knockdown_H_differentially_expressed_transcripts.txt",
+all <- 
+  topTable(fit = fit,
+           coef = 4, 
+           sort.by = "p",
+           number = "all",
+           lfc = 0,
+           p.value = 1) %>% 
+  subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value))
+
+top <-
+  topTable(fit = fit, 
+           coef = 4,
+           sort.by = "p",
+           number = "all", 
+           lfc = 0, 
+           p.value = .05) %>%
+  subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value))
+
+write.table(x = all    ,
+            file = "../../data_files/microarray_expressed_genes/Piwil2_knockdown_H_differentially_expressed_transcripts.txt",
             sep = "\t",
             row.names = F,
             quote = F)
-write.table(top    ,
-            file =  "../data/Piwil2_knockdown_H_top_pval05_differentially_expressed_transcripts.txt", 
+write.table(x = top    ,
+            file =  "../../data_files/microarray_expressed_genes/Piwil2_knockdown_H_top_pval05_differentially_expressed_transcripts.txt", 
             sep = "\t", 
             row.names = F,
             quote = F)
