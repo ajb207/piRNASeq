@@ -28,17 +28,17 @@ Below are the code chunks for analyzing the alignments gathered between each piR
 
 
 #loads the targeting sequences expressionts
-voom_sRNA <- read.table(file = "../data/targeting_sRNA.csv",
+voom_sRNA <- read.table(file = "../../data_files/stem_diff_targeting/targeting_sRNA.csv",
                         stringsAsFactors = F, 
                         header  = T, 
                         sep = ",")
-rmsk <- read.table(file = "../alignments/small_sa_og_norRNA_25_33_25bp_alignments_repeatmasker.txt",
+rmsk <- read.table(file = "../../data_files/stem_diff_alignments/small_sa_og_norRNA_25_33_25bp_alignments_repeatmasker.txt",
                    stringsAsFactors = F,
                    header  = F,
                    sep = "\t")
 rmsk <- rmsk[!grepl(rmsk$V3, pattern = "tRNA"),]
 voom_sRNA <- voom_sRNA[!(voom_sRNA$sRNA %in% rmsk$V1),]
-voom_top <- read.table(file = "../data/top_targeting_sRNA.csv", 
+voom_top <- read.table(file = "../../data_files/stem_diff_targeting/top_targeting_sRNA.csv", 
                        stringsAsFactors = F,
                        header  = T, 
                        sep = ",")
@@ -48,29 +48,27 @@ voom_top <- read.table(file = "../data/top_targeting_sRNA.csv",
 conversion <- read.table("../../conversion_sets/ensembl_conversion.txt", header = T, stringsAsFactors = F, sep = "\t")
 
 #load in the gene expression from RNA seq experiment
-gene_expression <- read.csv(file = "../../RNAseq/data/GSC_vs_nonGSC_all_differentially_expressed_genes.csv", 
+gene_expression <- read.csv(file = "../../data_files/RNAseq_expressed_genes/GSC_vs_nonGSC_all_differentially_expressed_genes.csv", 
                             sep = ",", 
                             stringsAsFactors = F)
-top_genes <- read.csv(file = "../../RNAseq/data/GSC_vs_nonGSC_top_pval05_differentially_expressed_genes.csv", 
+top_genes <- read.csv(file = "../../data_files/RNAseq_expressed_genes/GSC_vs_nonGSC_top_pval05_differentially_expressed_genes.csv", 
                       sep = ",",
                       stringsAsFactors = F)
 
 
 cDNA_alignments <- list()
-cDNA_alignments[[1]] <-  read.delim("../data/cDNA_temp_alignments_bt2v1score2.txt", header=FALSE, stringsAsFactors=FALSE)[,]
-cDNA_alignments[[2]] <-  read.delim("../data/cDNA_temp_alignments_bt2v1score4.txt", header=FALSE, stringsAsFactors=FALSE)[,]
-cDNA_alignments[[3]] <-  read.delim("../data/cDNA_temp_alignments_bt2v1score6.txt", header=FALSE, stringsAsFactors=FALSE)[,]
+cDNA_alignments[[1]] <-  read.delim("../../data_files/stem_diff_alignments/temp_alignments/cDNA_temp_alignments_bt2v1score2.txt", header=FALSE, stringsAsFactors=FALSE)[,]
+cDNA_alignments[[2]] <-  read.delim("../../data_files/stem_diff_alignments/temp_alignments/cDNA_temp_alignments_bt2v1score4.txt", header=FALSE, stringsAsFactors=FALSE)[,]
+cDNA_alignments[[3]] <-  read.delim("../../data_files/stem_diff_alignments/temp_alignments/cDNA_temp_alignments_bt2v1score6.txt", header=FALSE, stringsAsFactors=FALSE)[,]
 #cDNA_alignments[[4]] <-  read.delim("../data/cDNA_temp_alignments_bt2v1score8.txt", header=FALSE, stringsAsFactors=FALSE)[,]
 #cDNA_alignments[[5]] <-  read.delim("../data/cDNA_temp_alignments_bt2v1score10.txt", header=FALSE, stringsAsFactors=FALSE)[,]
 
 
 
 UTR_alignments <- list()
-UTR_alignments[[1]] <-  read.delim("../data/3UTR_temp_alignments_bt2v1score2.txt", 
-                                   header=FALSE, 
-                                   stringsAsFactors=FALSE)[,]
-UTR_alignments[[2]] <-  read.delim("../data/3UTR_temp_alignments_bt2v1score4.txt", header=FALSE, stringsAsFactors=FALSE)[,]
-UTR_alignments[[3]] <-  read.delim("../data/3UTR_temp_alignments_bt2v1score6.txt", header=FALSE, stringsAsFactors=FALSE)[,]
+UTR_alignments[[1]] <-  read.delim("../../data_files/stem_diff_alignments/temp_alignments/3UTR_temp_alignments_bt2v1score2.txt", header=FALSE, stringsAsFactors=FALSE)[,]
+UTR_alignments[[2]] <-  read.delim("../../data_files/stem_diff_alignments/temp_alignments/3UTR_temp_alignments_bt2v1score4.txt", header=FALSE, stringsAsFactors=FALSE)[,]
+UTR_alignments[[3]] <-  read.delim("../../data_files/stem_diff_alignments/temp_alignments/3UTR_temp_alignments_bt2v1score6.txt", header=FALSE, stringsAsFactors=FALSE)[,]
 UTR_alignments_names <- c("bt2v1score2", "bt2v1score4" , "bt2v1score6")
 
 
@@ -85,9 +83,9 @@ UTR_alignments_names <- c("bt2v1score2", "bt2v1score4" , "bt2v1score6")
 # liujkh;lkugs
 
 promoter_alignments <- list()
-promoter_alignments[[1]] <-  read.delim("../data/promoter_temp_alignments_bt2v1score2.txt", header=FALSE, stringsAsFactors=FALSE)[,]
-promoter_alignments[[2]] <-  read.delim("../data/promoter_temp_alignments_bt2v1score4.txt", header=FALSE, stringsAsFactors=FALSE)[,]
-promoter_alignments[[3]] <-  read.delim("../data/promoter_temp_alignments_bt2v1score6.txt", header=FALSE, stringsAsFactors=FALSE)[,]
+promoter_alignments[[1]] <-  read.delim("../../data_files/stem_diff_alignments/temp_alignments/promoter_temp_alignments_bt2v1score2.txt", header=FALSE, stringsAsFactors=FALSE)[,]
+promoter_alignments[[2]] <-  read.delim("../../data_files/stem_diff_alignments/temp_alignments/promoter_temp_alignments_bt2v1score4.txt", header=FALSE, stringsAsFactors=FALSE)[,]
+promoter_alignments[[3]] <-  read.delim("../../data_files/stem_diff_alignments/temp_alignments/promoter_temp_alignments_bt2v1score6.txt", header=FALSE, stringsAsFactors=FALSE)[,]
 promoter_alignments_names <- c("bt2v1score2", "bt2v1score4" , "bt2v1score6")
 
 
