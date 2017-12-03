@@ -1,0 +1,432 @@
+---
+title: "proTRAC Analysis"
+author: "Andrew Burr"
+date: "December 7, 2016"
+output: html_document
+---
+
+
+```{r setup, include=FALSE, echo = FALSE}
+
+require(limma)
+require(knitr)
+require(edgeR)
+require(biomaRt)
+require(DESeq2)
+require(edgeR)
+require(ggplot2)
+require(reshape)
+require(reshape2)
+require(Biostrings)
+require(plotly)
+require(qqman)
+require(scales)
+require(ggrepel)
+require(RColorBrewer)
+
+```
+
+
+
+```{r load_cluster_locations, echo = FALSE}
+
+#functions to turn the proTRAC data into a usable format
+clusterStart <- function(cluster_coordinates){
+  return(as.numeric(unlist(strsplit(cluster_coordinates, split = "-"))[1]))
+}
+clusterEnd <- function(cluster_coordinates){
+  return(as.numeric(unlist(strsplit(cluster_coordinates, split = "-"))[2]))
+}
+
+#load the proTRAC files
+protrac_folder <- "../proTRAC_files/clusters_minimum_1000/stem_diff"
+file_names <- list.files(protrac_folder)
+file_names <- strtrim(file_names, 9)
+
+
+files <- list.files(protrac_folder, full.names = TRUE, recursive = TRUE, pattern = "clusters.fasta")
+
+#load the proTRAC cluster
+loadClusters <- function(file){
+  
+  clusters <- read.table(file, sep = "\n", stringsAsFactors = FALSE)
+  clusters <- clusters[seq(1,nrow(clusters), 2),]
+  clusters <- unlist(strsplit(clusters, split = " "))
+  
+  clusters <- matrix(data = clusters, byrow = TRUE, ncol = 6)
+  clusters <- as.data.frame(clusters)
+  clusters <- clusters[,c(1,2,6)]
+  colnames(clusters) <- c("chromosome", "coordinates", "direction")
+  clusters$coordinates <- as.character(clusters$coordinates)
+  #clusters$chromosome <- as.numeric(clusters$chromosome)
+  clusters$start <- sapply(clusters$coordinates,FUN = clusterStart)
+  clusters$end <- sapply(clusters$coordinates,FUN = clusterEnd)
+  clusters$length <- clusters$end-clusters$start
+  clusters <- subset(clusters, select = - coordinates)
+  
+  return(clusters)
+}
+
+#load the cluster for every proTRAC file
+clusters <- lapply(X = files, FUN =loadClusters)
+names(clusters) <- file_names
+
+for(cluster in names(clusters)){
+  clusters[[cluster]]$cell_line <- cluster
+}
+
+#turn the list of clusters into a single dataframe
+all_clusters <- do.call("rbind", clusters)
+all_clusters$cell_line <- factor(all_clusters$cell_line)
+rownames(all_clusters) <- 1:nrow(all_clusters)
+
+all_clusters$cell_type <- NA
+all_clusters$cell_type[1:1528] <- "stem"
+all_clusters$cell_type[1528:2929] <- "diff"
+
+```
+
+
+
+
+```{r data_processing, echo = FALSE}
+
+#have similar clusters become the same cluster
+
+#all_clusters$overlap_start <- round(all_clusters$start - 1000)
+#all_clusters$overlap_end <- round(all_clusters$end + 1000)
+#select only stem and differentiated clusters
+stem_diff_clusters <- all_clusters[1:2929,]
+#sort based on the length of the cluster
+stem_diff_clusters <- stem_diff_clusters[order(stem_diff_clusters$length, decreasing = TRUE),]
+
+
+stem_diff_clusters$cluster_number <- NA
+cluster_number <- 0
+
+#go through the whole cluster
+for(row in 1:nrow(stem_diff_clusters)){
+  if(is.na(stem_diff_clusters$cluster_number[row])){
+    cluster_number <- cluster_number + 1
+    stem_diff_clusters$cluster_number[row] <- cluster_number
+    
+    
+    for(n in row:nrow(stem_diff_clusters)){
+      #if the chromosomes are the same
+      if(stem_diff_clusters$chromosome[row] == stem_diff_clusters$chromosome[n]){
+        #if they overlap
+        #if the starts are near one another
+        if(abs(stem_diff_clusters$start[row] - stem_diff_clusters$start[n]) <= 1000 |
+           #if the ends are near one another
+           abs(stem_diff_clusters$end[row] - stem_diff_clusters$end[n]) <= 1000 |
+           #if one cluster is in another
+           (stem_diff_clusters$start[row] < stem_diff_clusters$start[n] && stem_diff_clusters$end[row] > stem_diff_clusters$end[n])){
+          #if they are different cell ines
+          if(stem_diff_clusters$cell_line[row] != stem_diff_clusters$cell_line[n]){
+            #if they are going in the same direction
+            if(stem_diff_clusters$direction[row] == stem_diff_clusters$direction[n]){
+              #if they are different cluster rows
+              if(n != row){
+                stem_diff_clusters$cluster_number[n] <- cluster_number
+              }
+            }
+          }
+        } 
+      }
+    }
+  }
+}
+
+
+
+#my method
+man_clusters <- subset(stem_diff_clusters, select = c(chromosome,start,end,cell_type,cluster_number))
+cluster_freq <- as.data.frame(table(man_clusters$cluster_number,man_clusters$cell_type))
+colnames(cluster_freq) <- c("cluster_number", "cell_type", "cluster_count")
+man_clusters <- merge(subset(man_clusters, select = -cell_type), cluster_freq, by = "cluster_number", all = TRUE)
+
+man_clusters$chromosome <- factor(man_clusters$chromosome, levels = c(as.character(1:22),"X","MT","KI270213.1", "KI270733.1", "GL000220.1"))
+
+avg_start <- aggregate(start ~ cluster_number, data = man_clusters, mean)
+avg_start <- round(avg_start,0)
+man_clusters <- merge(subset(man_clusters, select = -start), avg_start, by = "cluster_number", all = TRUE)
+avg_end <- aggregate(end ~ cluster_number, data = man_clusters, mean)
+avg_start <- round(avg_end,0)
+man_clusters <- merge(subset(man_clusters, select = -end), avg_start, by = "cluster_number", all = TRUE)
+#man_clusters <- subset(man_clusters, select = -start.x)
+man_clusters <- unique(man_clusters)
+#remove clusters where it is not found in stem or diff, but it is found in the other cell type
+man_clusters <- man_clusters[man_clusters$cluster_count != 0,]
+
+
+
+man_clusters <- subset(man_clusters, select = c(chromosome,cell_type, cluster_count, cluster_number, start,end))
+#man_clusters$chromosome <- jitter(man_clusters$chromosome,amount = .49)
+
+
+```
+
+```{r piRNAbase_clusters}
+
+
+piRNAbase_clusters <- read.table("../data/hsa_cluster_hg38.txt", header = F, stringsAsFactors = F)[,-2]
+colnames(piRNAbase_clusters) <- c("cluster", "chromosome", "start", "end")
+piRNAbase_clusters$chromosome <- piRNAbase_clusters$chromosome + 1
+piRNAbase_clusters$chromosome[piRNAbase_clusters$chromosome == 23] <- "X"
+#piRNAbase_clusters$chromosome[piRNAbase_clusters$chromosome == 23] <- "Y"
+
+piRNAbase_clusters$cluster_number <- NA
+cluster_number <- 0
+
+#piRNAbase_clusters$cluster_number[1] <- 1
+#go through the whole cluster
+for(row in 1:nrow(piRNAbase_clusters)){
+  if(is.na(piRNAbase_clusters$cluster_number[row])){
+    cluster_number <- cluster_number + 1
+    piRNAbase_clusters$cluster_number[row] <- cluster_number
+  }
+    
+  
+  for(n in row:nrow(piRNAbase_clusters)){
+    #if the chromosomes are the same
+    if(piRNAbase_clusters$chromosome[row] == piRNAbase_clusters$chromosome[n]){
+      #if they overlap
+      if(abs(piRNAbase_clusters$start[n] - piRNAbase_clusters$end[row]) <= 1000){
+          #if they are different cluster rows
+          if(n != row){
+            piRNAbase_clusters$cluster_number[n] <- piRNAbase_clusters$cluster_number[row]
+          }
+        
+        } 
+      }
+    }
+  }
+
+#write.table(file = "../data/piRNAbase_clusters_fixed.csv", piRNAbase_clusters, quote = F, row.names = F, sep = ",")
+
+piRNAbase_clusters <- read.table("../data/piRNAbase_clusters_fixed.csv", header = T, stringsAsFactors = F, sep = ",")
+piRNAbase_clusters$chromosome[piRNAbase_clusters$chromosome == "X"] <- 23
+piRNAbase_clusters$chromosome <- as.numeric(piRNAbase_clusters$chromosome)
+piRNAbase_clusters$chromosome <- piRNAbase_clusters$chromosome -  1
+piRNAbase_clusters$chromosome[piRNAbase_clusters$chromosome == 0] <- "X"
+
+chromosome_to_cluster <- unique(subset(piRNAbase_clusters, select = c(chromosome, cluster_number)))
+piRNAbase_clusters <- aggregate(data = subset(piRNAbase_clusters, select = c(start,end, cluster_number)), . ~ cluster_number, mean )
+piRNAbase_clusters <- merge(piRNAbase_clusters, chromosome_to_cluster)
+
+piRNAbase_clusters$start <- piRNAbase_clusters$start/1000000
+piRNAbase_clusters$end <- piRNAbase_clusters$end/1000000
+
+piRNAbase_clusters$chromosome <- factor(piRNAbase_clusters$chromosome, levels =  c(as.character(1:22),"X"))
+
+
+```
+
+
+
+
+
+```{r lollipop, warning=FALSE}
+
+pie(rep(1,11), col = brewer.pal(11, "Spectral"))
+brewer.pal(11, "Spectral")
+
+
+#data for lollipop plot
+lollipop <- man_clusters[man_clusters$chromosome != "MT",]
+for(row in 1:nrow(lollipop)){
+  lollipop$x_cord[row] <- paste(lollipop$chromosome[row], lollipop$cell_type[row], collapse = " ")
+}
+
+chromosome_celltype <- c()
+for(chrom in c(as.character(1:22), "X","Y")){
+ chromosome_celltype[length(chromosome_celltype) + 1] <- paste(chrom, "stem", collapse = " ")
+ chromosome_celltype[length(chromosome_celltype) + 1] <- chrom
+ chromosome_celltype[length(chromosome_celltype) + 1] <- paste(chrom, "diff", collapse = " ") 
+}
+
+
+lollipop$x_cord <- factor(lollipop$x_cord,levels = chromosome_celltype)
+lollipop$start <- lollipop$start/1000000
+lollipop$end <- lollipop$end/1000000
+
+#lollipop$start_jitter <- jitter(lollipop$start,40)
+
+
+
+#vector holding chromosome info
+chromosome_info <- as.data.frame(c(248956422,242193529,198295559,190214555, 181538259, 170805979, 159345973 , 145138636, 138394717, 133797422,135086622, 133275309, 114364328, 107043718, 101991189,  90338345,  83257441,  80373285,  58617616, 64444167, 46709983 ,50818468, 156040895 ,  57227415)/1000000)
+colnames(chromosome_info) <- c("chromosome_length")
+chromosome_info$chromosome <- factor(c(as.character(1:22), "X","Y"), levels = levels(lollipop$x_cord))
+#chromosome_info$chromosome <- c(as.character(1:22), "X","Y")
+
+chromosome_info$centromere <- c(125,93.3,91,50.4,48.4,61,59.9,45.6,49,40.2,53.7,35.8,17.9,17.6,19,36.6,24,17.2,26.5,27.5,13.2,14.7,60.6,12.5)
+# 
+# chrom_info$left_width <- NA
+# chrom_info$right_width <- NA
+# for(row in 1:nrow(chrom_info)){
+#  chrom_info$left_width[row] <- paste(chrom_info$chrom_name[row], "stem", collapse = " ")
+#  chrom_info$right_width[row] <- paste(chrom_info$chrom_name[row], "diff", collapse = " ")
+# 
+# }
+  pdf("../../figures/piRNA_Clusters.pdf", 12,4)
+print(
+  ggplot() +
+     #chromosome
+    geom_bar(data = chromosome_info, aes(x = chromosome, y = chromosome_length),alpha = .5, stat = "identity",width = 1, fill = "white", color = "black") +
+    geom_text(data = chromosome_info, aes( x= chromosome, y = chromosome_length + 10, label = chromosome)) +
+    geom_errorbar(data=piRNAbase_clusters, aes(x = chromosome, ymin = start, ymax = end), width = .3, alpha = .6, color = brewer.pal(11,"Spectral")[9]) +
+  
+    #cluster location bar
+    geom_segment(data=lollipop,aes(x = chromosome, xend = x_cord, y = start , yend = start, color = cluster_count)) +
+    #cluster location point
+    geom_point(data=lollipop, aes(x = x_cord, y = start, color = cluster_count, shape = cell_type), size = 2, alpha = .6) +
+    #geom_point(data=piRNAbase_clusters, aes(x = chromosome, y = start), size = .1, shape =95) +
+    
+  #  geom_segment(data=piRNAbase_clusters, aes(x = chromosome, ymax = end, ymin = start), alpha = .9, color = brewer.pal(11,"Spectral")[9]) +
+    #geom_point(data = chrom_info, aes(x = chrom_name, y = centromere), color = c("white"), shape = '-', size = 20) +  
+    #geom_point(data = chrom_info, aes(x = chrom_name, y = centromere), shape = '-', size = 15) +  
+    #geom_segment(data = chrom_info, aes(x = chromosome, xend = x_cord, y = start, yend = start, color = cluster_count)) +    
+   
+    #centromere figure
+    geom_tile(data = chromosome_info, aes(x = chromosome, y = centromere,height = 1.3, width = 1.3), fill = "white") +
+    geom_tile(data = chromosome_info, aes(x = chromosome, y = centromere,height = 1.3, width = .75)) +
+    ylab("Location (Mbp)") + 
+    xlab("Chromosome") +
+    scale_y_continuous(labels = comma, breaks = c(50,100,150,200,250,300)) +
+    scale_x_discrete(limit = levels(lollipop$x_cord), breaks = NULL) +
+   # ggtitle("Cluster Locations on Chromosomes") +
+
+    labs(color = "Frequency\nof Cluster", shape = "Cell Type") +
+    #scale_shape_discrete(breaks=c("stem","diff"), labels = c("Stem", "Differentiated")) +
+    scale_shape_manual(values = c(19, 17),breaks=c("stem","diff"), labels = c("GSC", "Non-GSC"), guide = F) +
+    scale_color_continuous(breaks = c(1,2,3,4,5,6,7,8), trans = "reverse") +#,low = "darkblue", high = "lightblue") +
+    #guides(color = guide_legend(keywidth = 2, keyheight = 3)) +
+    #hide the x axis information
+    theme_bw() +  
+    theme(axis.text.x = element_blank(),
+          axis.ticks.x = element_blank(),
+          #legend.position = c(1,.65),
+          legend.position = "right",
+          legend.box = "horizontal",
+          legend.background = element_blank(),
+          legend.text=element_text(size=15), 
+          #legend.key.size = unit(.8, "cm"))
+          legend.key.height =  unit(.9,"cm"))
+          #legend.key.width =  unit(1,"cm"))
+)
+  dev.off()
+
+```
+
+
+```{r cluster_plots, echo = FALSE}
+
+#test <- all_clusters[(all_clusters$chromosome == 2 & (all_clusters$start > 68556068) & (all_clusters$start < 68836068)),  ]
+
+cluster_plot <- function(chromosome){
+  #create the data frame for ggplot to use
+  data <- all_clusters[all_clusters$chromosome == chromosome,]
+  
+  ggplot(data, aes(x=start, xend=end, y=cell_line, yend=cell_line, color= cell_type)) +
+    geom_segment(size=3) +
+    geom_point(size=3) +
+    geom_point(aes(x=end), size=2, shape = 18) +
+    ggtitle(paste("Chromosome", chromosome, collapse = " ")) + 
+    ylab("Cell Line") + 
+    xlab("Cluster Location") +
+    scale_x_continuous(labels = comma)
+}
+
+plots <- lapply(X = sort(unique(all_clusters$chromosome), decreasing = FALSE), FUN = cluster_plot)
+print(plots)
+
+```
+
+
+
+```{r additional plots}
+
+
+#manhattan
+ggplot(data = man_clusters) +
+  geom_jitter(aes(x =  chromosome, y = cluster_count, color = cell_type), height = 0.2) +
+  #scale_x_continuous(breaks = 1:25) +
+  scale_y_continuous(breaks = -8:8) +
+  ylab("Cluster Counts") +
+  xlab("Chromosome") +
+  ggtitle("Number of Cell Lines Containing Each Cluster")
+
+
+
+
+#manhattan
+ggplot(data = aggregate(data=man_clusters, cluster_count ~ chromosome + cluster_number, FUN = sum)) +
+  geom_jitter(aes(x =  chromosome, y = cluster_count, color = chromosome), height = 0.2) +
+  scale_y_continuous(breaks = 0:16) +
+  ylab("Cluster Counts") +
+  xlab("Chromosome") +
+  ggtitle("Number of Cell Lines Containing Each Cluster") +
+  guides(color = FALSE)
+
+
+
+
+
+#manhattan
+ggplot(data = aggregate(data=man_clusters, cluster_count ~ chromosome + cluster_number, FUN = sum)) +
+   geom_text(aes(x =  chromosome, y = cluster_count, color = chromosome, label = cluster_number),position = position_jitter(height = .5)) +
+  scale_y_continuous(breaks = 0:16) +
+  ylab("Cluster Counts") +
+  xlab("Chromosome") +
+  ggtitle("Number of Cell Lines Containing Each Cluster") +
+  guides(color = FALSE)
+
+
+#make differentiated counts negative
+man_clusters$cluster_count[man_clusters$cell_type == "diff"] <- man_clusters$cluster_count[man_clusters$cell_type == "diff"]*-1
+
+
+
+#manhattan
+ggplot(data = man_clusters) +
+  geom_jitter(aes(x =  chromosome, y = cluster_count, color = chromosome), height = 0.2) +
+  scale_y_continuous(breaks = -8:8) +
+  ylab("Cluster Counts") +
+  xlab("Chromosome") +
+  ggtitle("Number of Cell Lines Containing Each Cluster") +
+  guides(color = FALSE)
+
+
+#report the difference in cluster counts
+DE_clusters <- aggregate(data= man_clusters, cluster_count ~ cluster_number+chromosome, sum)
+
+#manhattan
+ggplot(data = DE_clusters) +
+  geom_point(aes(x =  chromosome, y = cluster_count, color = chromosome),position = position_jitter(height = 0.2)) +
+  #scale_x_continuous(breaks = 1:25) +
+  scale_y_continuous(breaks = -8:8) +
+  ylab("Sum Cluster Counts") +
+  xlab("Chromosome") +
+  guides(color = FALSE) +
+  ggtitle("Stem Cluster - Diff Cluster")
+
+
+#manhattan
+ggplot(data = DE_clusters) +
+  geom_text(aes(x =  chromosome, y = cluster_count, label = cluster_number),position = position_jitter(height = 0.2)) +
+  #scale_x_continuous(breaks = 1:25) +
+  scale_y_continuous(breaks = -8:8) +
+  #geom_jitter() +
+  ylab("Sum Cluster Counts") +
+  xlab("Chromosome") +
+  
+  ggtitle("Stem Cluster - Diff Cluster")
+
+
+
+
+man_clusters$cluster_count[man_clusters$cell_type == "diff"] <- man_clusters$cluster_count[man_clusters$cell_type == "diff"]*-1
+```
+
+

@@ -1,0 +1,1378 @@
+---
+title: "Small RNA Counts Analysis"
+author: "Andrew Burr"
+date: "September 14, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+require(limma)
+require(knitr)
+require(edgeR)
+require(biomaRt)
+require(DESeq2)
+require(edgeR)
+require(ggplot2)
+require(reshape)
+require(reshape2)
+require(stringdist)
+require(apcluster)
+require(qqman)
+require(Biostrings)
+require(motifRG)
+require(stringr)
+require(scales)
+require(ggrepel)
+require(RColorBrewer)
+
+conversion <- read.csv("../../reference_sets/ensembl_to_hgnc.txt", stringsAsFactors=FALSE)
+options(scipen=999)
+
+
+#create a fasta file from a list of sequences
+createpiRNAFasta <- function(fileName, extension){
+  
+  #read in the old file
+  fileText <- readLines(con  =fileName)
+  
+  newText <-vector(length = length(fileText)*2)
+  
+  #change name
+  n <- 1
+  for(line in seq(1,length(newText),2)){
+    #the fasta sequence to be inverted
+    sequence <- fileText[n]
+    #go to each letter and switch it
+    newText[line] <- paste(">",sequence, sep = "") 
+    n <- n + 1
+  }
+  
+  n <- 1
+  for(line in seq(2,length(newText),2)){
+    sequence <- fileText[n]
+    #go to each letter and switch it
+    newText[line] <- sequence
+    n <- n + 1
+  }
+  
+  return(newText)
+  #write.table(derp, "test.fa", sep = "\t", row.names = FALSE, col.names = FALSE, quote = FALSE)
+}
+
+
+
+removeRepeats <- function(read_counts){
+  
+  tRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_tRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+  lncRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_lncRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+  piRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_piRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+  YRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_YRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+  snoRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_snoRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+  miRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_miRNA.txt", header = FALSE, stringsAsFactors = FALSE, sep = "\t")
+  rmsk_plus40 <- read.table("../alignments/small_sa_og_norRNA_alignments_repeatmasker_plus40.txt", header = FALSE, stringsAsFactors = FALSE)
+  rmsk_plus40_tRNA <- rmsk_plus40[grepl(pattern = "tRNA", rmsk_plus40$V2),]
+  rmsk <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_repeatmasker.txt", header = FALSE, stringsAsFactors = FALSE, sep = "\t")
+  
+  rmsk$Family <- ifelse(grepl("tRNA", rmsk$V2), "tRNA", 
+                        ifelse(grepl(")n", rmsk$V2), "Simple", 
+                               ifelse(grepl("Alu", rmsk$V2), "Alu", 
+                                      ifelse(rmsk$V2 %in% c("U1", "U2", "U3", "U4", "U5", "U6", "U7", "U8"), "U", 
+                                             ifelse(grepl("HY", rmsk$V2), "Y-RNA", 
+                                                    ifelse(grepl(pattern =  paste(c("L1", "L2", "L3", "L4", "L5", "L6"), collapse = "|"), rmsk$V2), "LINE", 
+                                                           ifelse(grepl("MIR", rmsk$V2), "MIR", "other" )))))))
+  
+  rmsk$Family[rmsk$V2 == "5S"] <- "5S"
+  rmsk$Family[rmsk$V2 == "7SLRNA"] <- "7SLRNA"
+  rmsk$Family[rmsk$V2 == "7SK"] <- "7SK"
+  
+  
+  
+  
+  
+  
+  #read_counts <- read_counts[!(rownames(read_counts) %in% tRNA$V1),]
+  #read_counts <- read_counts[!(rownames(read_counts) %in% lncRNA$V1),]
+  read_counts <- read_counts[!(rownames(read_counts) %in% YRNA$V1),]
+  read_counts <- read_counts[!(rownames(read_counts) %in% snoRNA$V1),]
+  read_counts <- read_counts[!(rownames(read_counts) %in% rmsk$V1[rmsk$Family == "Simple"]),]
+  read_counts <- read_counts[!(rownames(read_counts) %in% rmsk$V1[rmsk$Family == "Alu"]),]
+  read_counts <- read_counts[!(rownames(read_counts) %in% rmsk$V1[rmsk$Family == "5S"]),]
+  read_counts <- read_counts[!(rownames(read_counts) %in% rmsk$V1[rmsk$Family == "7SLRNA"]),]
+  read_counts <- read_counts[!(rownames(read_counts) %in% rmsk$V1[rmsk$Family == "7SK"]),]
+  read_counts <- read_counts[!(rownames(read_counts) %in% rmsk$V1[rmsk$Family == "other"]),]
+  
+  return(read_counts)
+}
+
+
+removeSRP040525Repeats <- function(read_counts){
+  
+  
+  snoRNA <- read.table("../alignments/biogenesis_SRP040525/SRP040525_sa_alignments_snoRNA_list.txt", header = FALSE, stringsAsFactors = FALSE)
+  
+  rmsk <- read.table("../alignments/biogenesis_SRP040525/SRP040525_sa_alignments_repeatmasker.txt", header = FALSE, stringsAsFactors = FALSE, sep = "\t")
+  
+  rmsk$Family <- ifelse(grepl("tRNA", rmsk$V2), "tRNA", 
+                        ifelse(grepl(")n", rmsk$V2), "Simple", 
+                               ifelse(grepl("Alu", rmsk$V2), "Alu", 
+                                      ifelse(rmsk$V2 %in% c("U1", "U2", "U3", "U4", "U5", "U6", "U7", "U8"), "U", 
+                                             ifelse(grepl("HY", rmsk$V2), "Y-RNA", 
+                                                    ifelse(grepl(pattern =  paste(c("L1", "L2", "L3", "L4", "L5", "L6"), collapse = "|"), rmsk$V2), "LINE", 
+                                                           ifelse(grepl("MIR", rmsk$V2), "MIR", "other" )))))))
+  
+  rmsk$Family[rmsk$V2 == "5S"] <- "5S"
+  rmsk$Family[rmsk$V2 == "7SLRNA"] <- "7SLRNA"
+  rmsk$Family[rmsk$V2 == "7SK"] <- "7SK"
+  
+  #read_counts <- read_counts[!(rownames(read_counts) %in% tRNA$V1),]
+  #read_counts <- read_counts[!(rownames(read_counts) %in% lncRNA$V1),]
+  read_counts <- read_counts[!(rownames(read_counts) %in% snoRNA$V1),]
+  read_counts <- read_counts[!(rownames(read_counts) %in% rmsk$V1[rmsk$Family == "HY"]),]
+  read_counts <- read_counts[!(rownames(read_counts) %in% rmsk$V1[rmsk$Family == "Simple"]),]
+  read_counts <- read_counts[!(rownames(read_counts) %in% rmsk$V1[rmsk$Family == "Alu"]),]
+  read_counts <- read_counts[!(rownames(read_counts) %in% rmsk$V1[rmsk$Family == "5S"]),]
+  read_counts <- read_counts[!(rownames(read_counts) %in% rmsk$V1[rmsk$Family == "7SLRNA"]),]
+  read_counts <- read_counts[!(rownames(read_counts) %in% rmsk$V1[rmsk$Family == "7SK"]),]
+  read_counts <- read_counts[!(rownames(read_counts) %in% rmsk$V1[rmsk$Family == "other"]),]
+  
+  return(read_counts)
+}
+
+
+
+```
+
+
+```{r messing_around}
+read_counts <- read.delim("../sRNA_counts/small_sa_og_norRNA_counts.txt", sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
+rRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+read_counts <- read_counts[!(rownames(read_counts) %in% rRNA$V1),]
+read_counts <- read_counts[,4:19]
+read_counts <- read_counts[!rowSums(read_counts) == 0,]
+#switch the cell lines
+read_counts <- read_counts[,c(9:16, 1:8)]
+
+tRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_tRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+read_counts <- read_counts[(rownames(read_counts) %in% tRNA$V1),]
+
+```
+
+
+
+
+**Preprocessing read counts**
+
+Code useful for seeing how many reads survives each pre-processing step.
+
+
+
+
+
+```{r preprocessing_reads, echo = FALSE}
+
+#the filters are what sequences the piRNA align to
+filters <- list.files("../sRNA_counts/preprocessing_read_counts/", full.names = T)
+filters <- filters[c(1,2,5,3,4)]
+titles <- c( "15-40 nt", "On Genome", "Removed rRNA", "18-24nt", "25-33nt")
+
+#create a dataframe of the biogenesis
+df <- as.data.frame(matrix(nrow = 16, ncol = 0, byrow = TRUE))
+
+df$cell_line <- factor(c("387++","456++","3359++","3691++","3832++","4121++","4302++","H2S++","387-","456-","3359-","3691-","3832-","4121-","4302-","H2S-"))
+df$cell_type <- factor(c(rep("GSC", 8), (rep("Non-GSC",8))))
+
+
+
+
+#join all the biogenesis counts together
+for(n in 1:length(filters)){
+  
+  #import the desired read counts and take there sample sums
+  df[,titles[n]] <- colSums(read.delim(filters[n], sep=",", stringsAsFactors=FALSE, row.names = 1)[,4:19])
+  
+}
+
+
+
+temp <- melt(data = df[,], id.vars = c(1,2))
+
+ggplot(data = temp) +
+  #ggplot(data = temp) + 
+  geom_bar(aes(y = value, x = cell_line, fill = variable, color = cell_type),size = .6, stat = "identity", position = "dodge") +
+  labs(title = "Read Counts After Each Pre-processing Step") +
+  ylab("Surviving Raw Counts") +
+  xlab("Cell Lines") +
+  scale_y_continuous(labels = comma) +
+  scale_color_manual(values = c("black", "grey")) +
+  labs(fill = "Step") + 
+  #scale_fill_brewer(name = "Phenotype", labels = c("GSC", "Non-GSC"), breaks = c("stem", "diff")) +
+  
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank()
+  )
+
+
+
+
+
+ggplot(data = temp) +
+#ggplot(data = temp) + 
+  geom_bar(aes(y = value, x = cell_line, fill = variable, color = cell_type), size = 1.2, stat = "identity") +
+  labs(title = "Read Counts 25-33 nt from Predicted Biogenesis Locations") +
+  ylab("Counts Per Million") +
+  xlab("Cell Line") +
+  scale_y_continuous(labels = comma) +
+  scale_color_manual(values = c("black", "white")) +
+  #scale_fill_brewer(name = "Phenotype", labels = c("GSC", "Non-GSC"), breaks = c("stem", "diff")) +
+  
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank()
+  )
+
+
+
+
+
+```
+
+
+
+```{r basic_processing}
+
+
+#import the desired read counts
+read_counts <- read.delim("../sRNA_counts/small_sa_og_norRNA_25_33_counts.txt", sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
+#rRNA <-read.table("../fastx_files/small_sa_og_rRNA_list.txt", header = FALSE, stringsAsFactors = FALSE)
+piRNA <- read.table("../alignments/biogenesis_alignments_norRNA_25_33/small_sa_og_norRNA_25_33_list_alignments_piRNAbaseplus15_list.txt", header = FALSE, stringsAsFactors = FALSE)
+tRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_tRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+lncRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_lncRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+snoRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_snoRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+mRNA <- read.table("../alignments/biogenesis_alignments_norRNA_25_33/small_sa_og_norRNA_25_33_list_alignments_cDNA_list.txt", header = FALSE, stringsAsFactors = FALSE)
+rmsk <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_repeatmasker.txt", header = FALSE, stringsAsFactors = FALSE)
+YRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_YRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+
+rRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+read_counts <- read_counts[!(rownames(read_counts) %in% rRNA$V1),]
+
+YRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_YRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+read_counts <- read_counts[!(rownames(read_counts) %in% YRNA$V1),]
+
+read_counts <- read_counts[,4:19]
+read_counts <- read_counts[!rowSums(read_counts) == 0,]
+#switch the cell lines
+read_counts <- read_counts[,c(9:16, 1:8)]
+sum(read_counts[1:8]) #nonGSC
+sum(read_counts[9:16]) #GSC
+
+
+annotated_reads <- read_counts[rownames(read_counts) %in% piRNA$V1,]
+sum(annotated_reads)
+
+
+read_counts <- read_counts[,-c(3,11)]
+read_counts <- read_counts[!rowSums(read_counts) == 0,]
+
+#read_counts <- removeRepeats(read_counts)
+#remove low counts for differential expression
+read_counts <- read_counts[rowSums(cpm(read_counts) >= 1) >= 7,]
+read_counts <- read_counts[!rowSums(read_counts) == 0,]
+
+
+
+
+unique <- read.table("../alignments/small_sa_og_norRNA_alignments_uniquemapping_list.txt", header = FALSE, stringsAsFactors = FALSE)
+uniquepiRNA <-  read_counts[rownames(read_counts) %in% unique$V1,]
+RDpiRNA <- read_counts[!rownames(read_counts) %in% unique$V1,]
+uniquepiRNA <- uniquepiRNA[!rowSums(uniquepiRNA) == 0,]
+RDpiRNA <- RDpiRNA[!rowSums(RDpiRNA) == 0,]
+
+sum(read_counts)
+sum(read_counts[1:7]) #nonGSC
+sum(read_counts[8:14]) #GSC
+sum(uniquepiRNA)
+sum(RDpiRNA)
+
+sum(uniquepiRNA[1:7])
+sum(uniquepiRNA[8:14])
+sum(RDpiRNA[1:7])
+sum(RDpiRNA[8:14])
+
+
+
+
+write.table(rownames(read_counts[rownames(read_counts) %in% mRNA$V1,]), "../data/meme_files/mRNA_piRNA.txt", quote=F, row.names = F, col.names = F)
+write.table(createpiRNAFasta("../data/meme_files/mRNA_piRNA.txt"), "../data/meme_files/mRNA_piRNA.fa", quote= F, row.names = F, col.names = F, sep = "\t")
+writeXStringSet(trimFastaTo("../data/meme_files/mRNA_piRNA.fa", 1, 10), "../data/meme_files/mRNA_piRNA_10bp.fa" )
+
+
+write.table(rownames(read_counts[rownames(read_counts) %in% tRNA$V1,]), "../data/meme_files/tRNA_piRNA.txt", quote=F, row.names = F, col.names = F)
+write.table(createpiRNAFasta("../data/meme_files/tRNA_piRNA.txt"), "../data/meme_files/tRNA_piRNA.fa", quote= F, row.names = F, col.names = F, sep = "\t")
+writeXStringSet(trimFastaTo("../data/meme_files/tRNA_piRNA.fa", 1, 10), "../data/meme_files/tRNA_piRNA_10bp.fa" )
+
+write.table(rownames(read_counts[(rownames(read_counts) %in% rmsk$V1 == T) & (rownames(read_counts) %in% tRNA$V1 == F),]), "../data/meme_files/rmsk_notRNA_piRNA.txt", quote=F, row.names = F, col.names = F)
+write.table(createpiRNAFasta("../data/meme_files/rmsk_notRNA_piRNA.txt"), "../data/meme_files/rmsk_notRNA_piRNA.fa", quote= F, row.names = F, col.names = F, sep = "\t")
+writeXStringSet(trimFastaTo("../data/meme_files/rmsk_notRNA_piRNA.fa", 1, 10), "../data/meme_files/rmsk_notRNA_piRNA_10bp.fa")
+
+
+write.table(rownames(read_counts[rownames(read_counts) %in% unique$V1,]), "../data/meme_files/UM_piRNA.txt", quote=F, row.names = F, col.names = F)
+write.table(createpiRNAFasta("../data/meme_files/UM_piRNA.txt"), "../data/meme_files/UM_piRNA.fa", quote= F, row.names = F, col.names = F, sep = "\t")
+writeXStringSet(trimFastaTo("../data/meme_files/UM_piRNA.fa", 1, 10), "../data/meme_files/UM_piRNA_10bp.fa" )
+
+
+write.table(rownames(read_counts[!(rownames(read_counts) %in% unique$V1),]), "../data/meme_files/RD_piRNA.txt", quote=F, row.names = F, col.names = F)
+write.table(createpiRNAFasta("../data/meme_files/RD_piRNA.txt"), "../data/meme_files/RD_piRNA.fa", quote= F, row.names = F, col.names = F, sep = "\t")
+writeXStringSet(trimFastaTo("../data/meme_files/RD_piRNA.fa", 1, 10), "../data/meme_files/RD_piRNA_10bp.fa" )
+
+
+
+
+```
+
+
+
+
+**Counts of all 25-33 bp reads**
+
+
+```{r smallRNA_only_biogenesis_stats}
+
+
+read_counts <- read.delim("../sRNA_counts/small_sa_og_norRNA_25_33_counts.txt", sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
+read_counts <- read_counts[,4:19]
+rRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+read_counts <- read_counts[!(rownames(read_counts) %in% rRNA$V1),]
+
+#read_counts
+
+read_counts <- cpm(read_counts)
+
+#the filters are what sequences the piRNA align to
+filters <- list.files("../alignments/biogenesis_alignments_norRNA_25_33/", full.names = T)
+titles <- c("Clusters", "3UTR", "mRNA", "lincRNA", "lncRNA", "miRNA", "piRNA\nBase","Extended\npiRNA\nBase" ,"tRNA","Repeat\nElements", "snoRNA", "Y-RNA")
+
+#create a dataframe of the biogenesis
+df <- as.data.frame(matrix(nrow = 16, ncol = 0, byrow = TRUE))
+
+df$cell_line <- c("387++","456++","3359++","3691++","3832++","4121++","4302++","H2S++","387-","456-","3359-","3691-","3832-","4121-","4302-","H2S-")
+df$cell_type <- factor(c(rep("GSC", 8), (rep("Non-GSC",8))))
+
+df$total_sRNA <- colSums(read_counts)
+
+all <- c(NA)
+#all_filters <- c(NA)
+#join all the biogenesis counts together
+for(n in c(5,6,10,11)){
+  
+  #import the desired read counts
+  filter <- read.table(filters[n], header = FALSE, stringsAsFactors = FALSE)
+  df[,titles[n]] <- colSums(read_counts[rownames(read_counts) %in% filter$V1,])
+  
+  all <- c(all, filter$V1)
+}
+
+df$'No Previous\nAnnotation'  <- colSums(read_counts[!rownames(read_counts) %in% all,])
+
+
+
+
+
+pdf("../../figures/25_33_biogenesis.pdf", 6,4)
+  
+  temp <- melt(data = df[,-c(3)], id.vars = c(1,2))
+
+temp <- aggregate(data = temp, value ~ cell_line + cell_type+variable, sum)
+
+
+ggplot(data = temp ) +
+#ggplot(data = temp) + 
+  geom_boxplot(aes(y = value, x = variable, fill = cell_type)) +
+  #labs(title = "Small RNA Anotation of 25-33 nt Reads") +
+  ylab("Counts Per Million") +
+  xlab("Small RNA Annotation") +
+  scale_y_continuous(labels = comma) +
+  scale_fill_brewer(name = "Phenotype", labels = c("GSC", "Non-GSC"), breaks = c("GSC", "Non-GSC")) +
+  
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank() 
+  )
+
+
+dev.off()
+
+```
+
+
+
+**Predicted Biogenesis**
+
+
+```{r piRBase_biogenesis_stats}
+
+
+#import the desired read counts
+read_counts <- read.delim("../sRNA_counts/small_sa_og_norRNA_25_33_counts.txt", sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
+read_counts <- read_counts[,4:19]
+
+rRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+read_counts <- read_counts[!(rownames(read_counts) %in% rRNA$V1),]
+
+YRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_YRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+read_counts <- read_counts[!(rownames(read_counts) %in% YRNA$V1),]
+
+
+#read_counts <- removeRepeats(read_counts)
+
+read_counts <- cpm(read_counts)
+
+filters <- list.files("../alignments/biogenesis_alignments_norRNA_25_33/", full.names = TRUE)
+titles <- c("Clusters",  "3' UTR", "mRNA",  "lincRNA", "lncRNA","miRNA",  "piRBase\nOriginal", "Extended\npiRBase\nTranscriptome", "tRNA", "Repeat", "snoRNA", "YRNA")
+
+
+#read_counts <- cpm(read_counts)  
+
+#create a dataframe of the biogenesis
+df <- as.data.frame(matrix(nrow = 16, ncol = 0, byrow = TRUE))
+df$cell_line <- c("387++","456++","3359++","3691++","3832++","4121++","4302++","H2S++","387-","456-","3359-","3691-","3832-","4121-","4302-","H2S-")
+df$cell_type <- factor(c(rep("GSC", 8), (rep("Non-GSC",8))))
+#df$RP_piRNA <- total_counts$sa_og_norRNA_25_33_noncRNA_repeat
+unique <- read.table("../alignments/small_sa_og_norRNA_alignments_uniquemapping_list.txt", header = FALSE, stringsAsFactors = FALSE)
+temp <- df
+df$piRNA <- "Unique\nMapping piRNA"
+temp$piRNA <- "Repeat\nMapping piRNA"
+df$Total <- colSums(read_counts[rownames(read_counts) %in% unique$V1,])
+temp$Total <- colSums(read_counts[!rownames(read_counts) %in% unique$V1,])
+
+all_unique <- c(NA)
+all_repeat <- c(NA)
+UM_counts <- as.data.frame(read_counts[(rownames(read_counts) %in% unique$V1),])
+RM_counts <- as.data.frame(read_counts[!(rownames(read_counts) %in% unique$V1),])
+
+#join all the biogenesis counts together
+for(n in c(7,8)){
+  
+  
+  
+  filter <- read.table(filters[n], header = FALSE, stringsAsFactors = FALSE)
+  #print(file)
+  column_sums <- as.data.frame(colSums(UM_counts[rownames(UM_counts) %in% filter$V1,]))
+  rownames(column_sums) <- c("387++","456++","3359++","3691++","3832++","4121++","4302++","H2S++","387-","456-","3359-","3691-","3832-","4121-","4302-","H2S-")
+  colnames(column_sums) <- titles[n]
+  df <- cbind(df,column_sums)
+  if(n != 1){
+  all_unique <- c(all_unique, filter$V1)
+  }
+}
+
+for(n in c(7,8)){ 
+  
+  
+  
+  filter <- read.table(filters[n], header = FALSE, stringsAsFactors = FALSE)
+  #print(file)
+  column_sums <- as.data.frame(colSums(RM_counts[rownames(RM_counts) %in% filter$V1,]))
+  rownames(column_sums) <- c("387++","456++","3359++","3691++","3832++","4121++","4302++","H2S++","387-","456-","3359-","3691-","3832-","4121-","4302-","H2S-")
+  colnames(column_sums) <-titles[n]
+  
+  
+  temp <- cbind(temp,column_sums)
+  if(n != 1){
+  all_repeat <- c(all_repeat, filter$V1)
+  }
+}
+
+
+df$'No Previous\nAnnotation' <- colSums(UM_counts[!rownames(UM_counts) %in% all_unique,])
+
+temp$'No Previous\nAnnotation' <- colSums(RM_counts[!rownames(RM_counts) %in% all_repeat,])
+
+
+df <- rbind(df, temp)
+
+
+
+  
+#  Counts of piRNA from each predicted biogenesis location based on PHENOTYPE
+pdf("../../figures/Boxplot_piRNA_biogenesis_phenotype_piRBaseonly.pdf", 6, 4)
+
+
+
+temp <- melt(data = df[,-c(3,4)], id.vars = c(1,2))
+temp <- aggregate(data = temp, value ~ cell_line + cell_type+variable, sum)
+
+
+ggplot(data = temp) +
+#ggplot(data = temp) + 
+  geom_boxplot(aes(y = value, x = variable, fill = cell_type)) +
+ # labs(title = "Putative piRNA Secondary Annotation") +
+  ylab("Counts Per Million of piRNA") +
+  xlab("piRNA Annotation") +
+  scale_y_continuous(labels = comma) +
+  #scale_x_discrete(limits = c("Clusters", "mRNA", "tRNA", "snoRNA", "No Previous\nAnnotation")) +
+  scale_x_discrete(limits = c("piRBase\nOriginal", "Extended\npiRBase\nTranscriptome", "No Previous\nAnnotation"), labels = c("piRBase\nOriginal", "Extended\npiRBase\nTranscriptome", "No piRBase\nAnnotation")) +
+  scale_fill_brewer(name = "Phenotype", labels = c("GSC", "Non-GSC"), breaks = c("GSC", "Non-GSC")) +
+  
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank()
+  )
+
+
+
+dev.off()
+
+
+
+
+```
+
+
+
+
+```{r separated_out_biogenesis_stats}
+
+
+
+#import the desired read counts
+read_counts <- read.delim("../sRNA_counts/small_sa_og_norRNA_25_33_counts.txt", sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
+read_counts <- read_counts[,4:19]
+rRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+read_counts <- read_counts[!(rownames(read_counts) %in% rRNA$V1),]
+YRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_YRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+read_counts <- read_counts[!(rownames(read_counts) %in% YRNA$V1),]
+read_counts <- cpm(read_counts)
+
+filters <- list.files("../alignments/biogenesis_alignments_norRNA_25_33/", full.names = TRUE)
+titles <- c("Clusters",  "3' UTR", "mRNA",  "lincRNA", "lncRNA","miRNA",  "Original\npiRNAbase", "Extended\npiRBase\nTranscriptome", "tRNA", "Repeat", "snoRNA", "YRNA")
+
+
+#read_counts <- cpm(read_counts)  
+
+#create a dataframe of the biogenesis
+df <- as.data.frame(matrix(nrow = 16, ncol = 0, byrow = TRUE))
+df$cell_line <- c("387++","456++","3359++","3691++","3832++","4121++","4302++","H2S++","387-","456-","3359-","3691-","3832-","4121-","4302-","H2S-")
+df$cell_type <- factor(c(rep("GSC", 8), (rep("Non-GSC",8))))
+#df$RP_piRNA <- total_counts$sa_og_norRNA_25_33_noncRNA_repeat
+unique <- read.table("../alignments/small_sa_og_norRNA_alignments_uniquemapping_list.txt", header = FALSE, stringsAsFactors = FALSE)
+temp <- df
+df$piRNA <- "Unique\nMapping piRNA"
+temp$piRNA <- "Repeat\nMapping piRNA"
+df$Total <- colSums(read_counts[rownames(read_counts) %in% unique$V1,])
+temp$Total <- colSums(read_counts[!rownames(read_counts) %in% unique$V1,])
+
+all_unique <- c(NA)
+all_repeat <- c(NA)
+UM_counts <- as.data.frame(read_counts[(rownames(read_counts) %in% unique$V1),])
+RM_counts <- as.data.frame(read_counts[!(rownames(read_counts) %in% unique$V1),])
+
+#join all the biogenesis counts together
+for(n in c(1,3,9,11)){
+  
+  
+  
+  filter <- read.table(filters[n], header = FALSE, stringsAsFactors = FALSE)
+  #print(file)
+  column_sums <- as.data.frame(colSums(UM_counts[rownames(UM_counts) %in% filter$V1,]))
+  rownames(column_sums) <- c("387++","456++","3359++","3691++","3832++","4121++","4302++","H2S++","387-","456-","3359-","3691-","3832-","4121-","4302-","H2S-")
+  colnames(column_sums) <- titles[n]
+  df <- cbind(df,column_sums)
+  if(n != 1){
+  all_unique <- c(all_unique, filter$V1)
+  }
+}
+
+for(n in c(1,3,9,11)){ 
+  
+  
+  
+  filter <- read.table(filters[n], header = FALSE, stringsAsFactors = FALSE)
+  #print(file)
+  column_sums <- as.data.frame(colSums(RM_counts[rownames(RM_counts) %in% filter$V1,]))
+  rownames(column_sums) <- c("387++","456++","3359++","3691++","3832++","4121++","4302++","H2S++","387-","456-","3359-","3691-","3832-","4121-","4302-","H2S-")
+  colnames(column_sums) <-titles[n]
+  
+  
+  temp <- cbind(temp,column_sums)
+  if(n != 1){
+  all_repeat <- c(all_repeat, filter$V1)
+  }
+}
+
+
+df$'No Previous\nAnnotation' <- colSums(UM_counts[!rownames(UM_counts) %in% all_unique,])
+temp$'No Previous\nAnnotation' <- colSums(RM_counts[!rownames(RM_counts) %in% all_repeat,])
+
+df <- rbind(df, temp)
+
+
+
+  
+#  Counts of piRNA from each predicted biogenesis location based on PHENOTYPE
+pdf("../../figures/Boxplot_piRNA_biogenesis_phenotype_nopiRBase.pdf", 6, 4)
+
+
+
+temp <- melt(data = df[,-c(3,4)], id.vars = c(1,2))
+temp <- aggregate(data = temp, value ~ cell_line + cell_type+variable, sum)
+
+
+ggplot(data = temp) +
+#ggplot(data = temp) + 
+  geom_boxplot(aes(y = value, x = variable, fill = cell_type)) +
+ # labs(title = "Putative piRNA Secondary Annotation") +
+  ylab("Counts Per Million of piRNA") +
+  xlab("piRNA Biogenesis Annotation") +
+  scale_y_continuous(labels = comma) +
+  scale_x_discrete(limits = c("Clusters", "mRNA", "tRNA", "snoRNA", "No Previous\nAnnotation")) +
+  scale_fill_brewer(name = "Phenotype", labels = c("GSC", "Non-GSC"), breaks = c("GSC", "Non-GSC")) +
+  
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank()
+  )
+
+
+
+dev.off()
+
+
+
+
+```
+
+
+
+```{r total_biogenesis_stats}
+
+
+
+#import the desired read counts
+read_counts <- read.delim("../sRNA_counts/small_sa_og_norRNA_25_33_counts.txt", sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
+read_counts <- read_counts[,4:19]
+rRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+read_counts <- read_counts[!(rownames(read_counts) %in% rRNA$V1),]
+YRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_YRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+read_counts <- read_counts[!(rownames(read_counts) %in% YRNA$V1),]
+
+
+
+read_counts <- cpm(read_counts)
+filters <- list.files("../alignments/biogenesis_alignments_norRNA_25_33/", full.names = TRUE)
+titles <- c("Clusters",  "3' UTR", "mRNA",  "lincRNA", "lncRNA","miRNA",  "piRBase\nOriginal", "Extended\npiRBase\nTranscriptome", "tRNA", "Repeat", "snoRNA", "YRNA")
+
+
+
+#create a dataframe of the biogenesis
+df <- as.data.frame(matrix(nrow = 16, ncol = 0, byrow = TRUE))
+df$cell_line <- c("387++","456++","3359++","3691++","3832++","4121++","4302++","H2S++","387-","456-","3359-","3691-","3832-","4121-","4302-","H2S-")
+df$cell_type <- factor(c(rep("GSC", 8), (rep("Non-GSC",8))))
+#df$RP_piRNA <- total_counts$sa_og_norRNA_25_33_noncRNA_repeat
+unique <- read.table("../alignments/small_sa_og_norRNA_alignments_uniquemapping_list.txt", header = FALSE, stringsAsFactors = FALSE)
+temp <- df
+df$piRNA <- "Unique\nMapping piRNA"
+temp$piRNA <- "Repeat\nMapping piRNA"
+df$Total <- colSums(read_counts[rownames(read_counts) %in% unique$V1,])
+temp$Total <- colSums(read_counts[!rownames(read_counts) %in% unique$V1,])
+
+all_unique <- c(NA)
+all_repeat <- c(NA)
+UM_counts <- as.data.frame(read_counts[(rownames(read_counts) %in% unique$V1),])
+RM_counts <- as.data.frame(read_counts[!(rownames(read_counts) %in% unique$V1),])
+
+#join all the biogenesis counts together
+for(n in c(1,3,8,9,11)){
+  
+  
+  
+  filter <- read.table(filters[n], header = FALSE, stringsAsFactors = FALSE)
+  #print(file)
+  column_sums <- as.data.frame(colSums(UM_counts[rownames(UM_counts) %in% filter$V1,]))
+  rownames(column_sums) <- c("387++","456++","3359++","3691++","3832++","4121++","4302++","H2S++","387-","456-","3359-","3691-","3832-","4121-","4302-","H2S-")
+  colnames(column_sums) <- titles[n]
+  df <- cbind(df,column_sums)
+  if(n != 1){
+  all_unique <- c(all_unique, filter$V1)
+  }
+}
+
+for(n in c(1,3,8,9,11)){ 
+  
+  
+  
+  filter <- read.table(filters[n], header = FALSE, stringsAsFactors = FALSE)
+  #print(file)
+  column_sums <- as.data.frame(colSums(RM_counts[rownames(RM_counts) %in% filter$V1,]))
+  rownames(column_sums) <- c("387++","456++","3359++","3691++","3832++","4121++","4302++","H2S++","387-","456-","3359-","3691-","3832-","4121-","4302-","H2S-")
+  colnames(column_sums) <-titles[n]
+  
+  
+  temp <- cbind(temp,column_sums)
+  if(n != 1){
+  all_repeat <- c(all_repeat, filter$V1)
+  }
+}
+
+
+df$'No Previous\nAnnotation' <- colSums(UM_counts[!rownames(UM_counts) %in% all_unique,])
+temp$'No Previous\nAnnotation' <- colSums(RM_counts[!rownames(RM_counts) %in% all_repeat,])
+
+df <- rbind(df, temp)
+
+
+
+
+#boxplots of piRNA type
+
+pdf("../../figures/Boxplot_piRNA_biogenesis_piRNAtype.pdf", 6, 4)
+
+
+
+temp <- melt(data = df[,-c(4)], id.vars = c(1,2,3))
+temp <- aggregate(data = temp, value ~ piRNA + cell_line  + variable, sum)
+temp$piRNA <- factor(temp$piRNA, levels = c("Unique\nMapping piRNA", "Repeat\nMapping piRNA"))
+
+
+
+ggplot(data = temp) +
+#ggplot(data = temp) + 
+  geom_boxplot(aes(y = value, x = variable, fill = piRNA)) +
+ # labs(title = "Putative piRNA Secondary Annotation") +
+  ylab("Counts Per Million of piRNA") +
+  xlab("piRNA Annotation") +
+  scale_y_continuous(labels = comma) +
+  scale_x_discrete(limits = c("Clusters", "mRNA", "tRNA", "snoRNA", "Extended\npiRBase\nTranscriptome", "No Previous\nAnnotation")) +
+  scale_fill_brewer(name = "piRNA", labels = c("Unique\nMapping", "Repeat\nMapping"), breaks = c("Unique\nMapping piRNA", "Repeat\nMapping piRNA")) +
+  
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank()
+  )
+
+
+
+dev.off()
+
+
+
+
+
+
+
+#boxplots with both phenotype and piRNA type
+
+pdf("../../figures/Boxplot_piRNA_biogenesis_phenotype_and_piRNAtype.pdf", 12, 6)
+
+
+
+temp <- melt(data = df[,-c(4)], id.vars = c(1,2,3))
+#temp <- aggregate(data = temp, value ~ piRNA +cell_line + cell_type+variable, sum)
+temp$piRNA <- factor(temp$piRNA, levels = c("Unique\nMapping piRNA", "Repeat\nMapping piRNA"))
+
+
+ggplot(data = temp) +
+#ggplot(data = temp) + 
+  geom_boxplot(aes(y = value, x = variable, fill = cell_type)) +
+  facet_grid(.~piRNA) +
+ # labs(title = "Putative piRNA Secondary Annotation") +
+  ylab("Counts Per Million of piRNA") +
+  xlab("piRNA Annotation") +
+  scale_y_continuous(labels = comma) +
+  scale_x_discrete(limits = c( "Clusters", "mRNA", "tRNA", "snoRNA", "Extended\npiRBase\nTranscriptome", "No Previous\nAnnotation")) +
+  scale_fill_brewer(name = "Phenotype", labels = c("GSC", "Non-GSC"), breaks = c("GSC", "Non-GSC")) +
+  #scale_color_manual(name = "piRNA", labels = c("Unique\nMapping", "Repeat\nMapping"), breaks = c("UM", "RM"), values = c("grey","black")) +
+  #scale_linetype_manual(name = "piRNA", labels = c("Unique\nMapping", "Repeat\nMapping"), breaks = c("UM", "RM"), values = c(5,1)) +
+  #scale_size_manual(name = "piRNA", labels = c("Unique\nMapping", "Repeat\nMapping"), breaks = c("UM", "RM"), values = c(.5,1)) +
+  
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank()
+  )
+
+
+
+
+
+dev.off()
+
+
+
+
+
+
+
+
+
+
+
+```
+
+
+
+
+```{r repeat_elements, echo = FALSE}
+
+#import the desired read counts
+read_counts <- read.delim("../sRNA_counts/small_sa_og_norRNA_25_33_counts.txt", sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
+
+read_counts <- read_counts[,4:19]
+
+rRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+read_counts <- read_counts[!(rownames(read_counts) %in% rRNA$V1),]
+
+read_counts <- as.data.frame(cpm(read_counts))
+#read_counts <- read_counts[rowSums(read_counts >0) >= 6,]
+
+rmsk <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_repeatmasker.txt", header = FALSE, stringsAsFactors = FALSE, sep = "\t")
+
+
+
+read_counts$sRNA <- rownames(read_counts)
+read_counts <- merge(read_counts, rmsk[,c(1,2)], by.x = "sRNA", by.y = "V1")
+read_counts <- aggregate(data =read_counts[,-1], .~V2, FUN = sum)
+#denote the family of the repeat element
+read_counts$Family <- ifelse(grepl("tRNA", read_counts$V2), "tRNA", 
+                             ifelse(grepl(")n", read_counts$V2), "Simple", 
+                                    ifelse(grepl("Alu", read_counts$V2), "SINE", 
+                                           ifelse(read_counts$V2 %in% c("U1", "U2", "U3", "U4", "U5", "U6", "U7", "U8"), "AU-rich", 
+                                                  ifelse(grepl("HY", read_counts$V2), "Y-RNA", 
+                                                         ifelse(grepl(pattern =  paste(c("L1", "L2", "L3", "L4", "L5", "L6"), collapse = "|"), read_counts$V2), "LINE", 
+                                                                ifelse(grepl("MIR", read_counts$V2), "SINE", "other" )))))))
+
+read_counts$Family[read_counts$V2 == "5S"] <- "other"
+read_counts$Family[read_counts$V2 == "7SLRNA"] <- "7SLRNA"
+read_counts$Family[read_counts$V2 == "7SK"] <- "other"
+
+
+
+#read_counts[,2:17] <- cpm(read_counts[,2:17])
+
+#write.table(rownames(read_counts), "../fastx_files/sa_og_norRNA_25_33_alignments_repeat.txt", quote=F, row.names = F, col.names = T, sep = ",")
+
+repeats <- as.data.frame(matrix(nrow = nrow(read_counts), ncol =0, byrow = T ))
+repeats$Family <- read_counts$Family
+repeats$GSC_Avg_CPM <- rowMeans(read_counts[,2:9])
+repeats$NonGSC_Avg_CPM <- rowMeans(read_counts[,10:17])
+
+repeats <- aggregate(data =repeats, .~Family, FUN = sum)
+
+
+pdf("../../figures/25_33_repeatelements_bar.pdf", 6,4)
+
+
+  
+temp <- repeats
+temp <- melt(temp, 1)
+
+
+ggplot(data = temp) +
+  geom_bar(aes(y = value, x = variable, fill = Family), stat = "identity") +
+   #geom_text(aes(x = variable, y = value, label = Family)) +
+  #coord_polar(theta = "y") + 
+  labs(title = "") +
+  ylab("Counts Per Million") +
+  xlab("Phenotype") +
+  scale_fill_brewer(palette="Spectral") +
+  scale_x_discrete(labels = c("GSC", "Non-GSC")) +
+  scale_y_continuous(labels = comma) +
+  #scale_fill_brewer(name = "Phenotype", labels = c("GSC", "Non-GSC"), breaks = c("stem", "diff")) +
+  guides(fill = guide_legend(reverse=F)) +
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank()
+  )
+
+
+
+dev.off()
+
+
+
+
+
+
+#import the desired read counts
+read_counts <- read.delim("../sRNA_counts/small_sa_og_norRNA_25_33_counts.txt", sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
+
+read_counts <- read_counts[,4:19]
+
+rRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+read_counts <- read_counts[!(rownames(read_counts) %in% rRNA$V1),]
+
+#read_counts <- read_counts[rowSums(read_counts >0) >= 6,]
+
+rmsk <- read.table("../alignments/small_sa_og_norRNA_alignments_repeatmasker_plus40.txt", header = FALSE, stringsAsFactors = FALSE, sep = "\t")
+
+
+
+read_counts$sRNA <- rownames(read_counts)
+read_counts <- merge(read_counts, rmsk[,c(1,2)], by.x = "sRNA", by.y = "V1")
+read_counts <- aggregate(data =read_counts[,-1], .~V2, FUN = sum)
+#denote the family of the repeat element
+read_counts$Family <- ifelse(grepl("tRNA", read_counts$V2), "tRNA", 
+                             ifelse(grepl(")n", read_counts$V2), "Simple", 
+                                    ifelse(grepl("Alu", read_counts$V2), "SINE", 
+                                           ifelse(read_counts$V2 %in% c("U1", "U2", "U3", "U4", "U5", "U6", "U7", "U8"), "AU-rich", 
+                                                  ifelse(grepl("HY", read_counts$V2), "Y-RNA", 
+                                                         ifelse(grepl(pattern =  paste(c("L1", "L2", "L3", "L4", "L5", "L6"), collapse = "|"), read_counts$V2), "LINE", 
+                                                                ifelse(grepl("MIR", read_counts$V2), "SINE", "other" )))))))
+
+read_counts$Family[read_counts$V2 == "5S"] <- "other"
+read_counts$Family[read_counts$V2 == "7SLRNA"] <- "7SLRNA"
+read_counts$Family[read_counts$V2 == "7SK"] <- "other"
+
+
+
+read_counts[,2:17] <- cpm(read_counts[,2:17])
+
+#write.table(rownames(read_counts), "../fastx_files/sa_og_norRNA_25_33_alignments_repeatplus40.txt", quote=F, row.names = F, col.names = T, sep = ",")
+
+pie <- as.data.frame(matrix(nrow = nrow(read_counts), ncol =0, byrow = T ))
+pie$Family <- read_counts$Family
+pie$GSC_Avg_CPM <- rowMeans(read_counts[,2:9])
+pie$NonGSC_Avg_CPM <- rowMeans(read_counts[,10:17])
+
+pie <- aggregate(data =pie, .~Family, FUN = sum)
+
+temp <- pie
+temp <- melt(temp, 1)
+
+
+pdf("../../figures/25_33_repeatelementsplus40_pie.pdf", 6,4)
+print(
+
+
+ggplot(data = temp[,]) +
+  geom_bar(aes(y = value, x = variable, fill = Family), stat = "identity") +
+   #geom_text(aes(x = variable, y = value, label = Family)) +
+  #coord_polar(theta = "y") + 
+  labs(title = "Repeat Element Families 40bp Extension") +
+  ylab("") +
+  xlab("") +
+ 
+  scale_y_continuous(breaks = c()) +
+  #scale_fill_brewer(name = "Phenotype", labels = c("GSC", "Non-GSC"), breaks = c("stem", "diff")) +
+  
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank()
+  )
+
+)
+dev.off()
+
+
+```
+
+
+
+```{r shared_reads}
+
+top_25_33 <- read.table("../data/top_25_33_all.csv", header = T, sep = ",")
+
+
+SRP040525 <- read.delim("../sRNA_counts/SRP040525_counts.txt", sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
+og <- read.table("../alignments/SRP040525_sa_alignments_genome_list.txt", header = FALSE, stringsAsFactors = FALSE)
+rRNA <- read.table("../alignments/biogenesis_SRP040525/SRP040525_sa_alignments_rRNA_list.txt", header = FALSE, stringsAsFactors = FALSE)
+YRNA <- read.table("../alignments/biogenesis_SRP040525/SRP040525_sa_alignments_YRNA_list.txt", header = FALSE, stringsAsFactors = FALSE)
+#SRP040525 <- SRP040525[(rownames(SRP040525) %in% filter$V1),]
+SRP040525 <- SRP040525[rownames(SRP040525) %in% og$V1,]
+SRP040525 <- SRP040525[!rownames(SRP040525) %in% rRNA$V1,]
+SRP040525 <- SRP040525[!rownames(SRP040525) %in% YRNA$V1,]
+
+SRP040525 <- SRP040525[nchar(rownames(SRP040525)) >= 25 & nchar(rownames(SRP040525)) <= 33,]
+#SRP040525 <- SRP040525[,-c(1,7)]
+SRP040525 <- SRP040525[rowSums(cpm(SRP040525) >=1) >= 6,]
+#SRP040525 <- removeSRP040525Repeats(SRP040525)
+SRP040525 <- rownames(SRP040525)
+
+piRBase <- read.delim("../../reference_genomes/piRNA_base_human_v1.0.fa", sep=",", stringsAsFactors=FALSE)[,]
+piRBase <- piRBase[seq(1,length(piRBase),2)]
+piRBase <- piRBase[nchar(piRBase) >= 25 & nchar(piRBase) <= 33]
+
+#get reads for our data
+read_counts <- read.delim("../sRNA_counts/small_sa_og_norRNA_25_33_counts.txt", sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
+#remove non used reads
+rRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+read_counts <- read_counts[!(rownames(read_counts) %in% rRNA$V1),]
+YRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_YRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+read_counts <- read_counts[!(rownames(read_counts) %in% YRNA$V1),]
+
+
+read_counts <- read_counts[,4:19]
+read_counts <- read_counts[,-c(3,11)]
+read_counts <- read_counts[rowSums(cpm(read_counts) >= 1) >= 7,]
+#read_counts <- removeRepeats(read_counts)
+
+data <- rownames(read_counts)
+
+
+
+#read_counts <- read.delim("../sRNA_counts/sra_all_sa_og_norRNA_25_33_read_counts.txt", sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
+#read_counts <- read_counts[,c(26:29)]
+#brain <- rownames(read_counts[rowSums(read_counts[,1:2]) > 6, 1:2])
+#testis <- rownames(read_counts[rowSums(read_counts[,3:4]) > 6, 3:4])
+rm(read_counts)
+
+all_reads <- unique(c(data, SRP040525,piRBase))
+all_reads <- as.data.frame(all_reads)
+rownames(all_reads) <- all_reads$all_reads
+all_reads <- all_reads[,-1]
+piRNAdata <- read.table("../alignments/biogenesis_alignments_norRNA_25_33/small_sa_og_norRNA_25_33_list_alignments_piRNAbaseplus15_list.txt", header = FALSE, stringsAsFactors = FALSE)
+piRNASRP <- read.table("../alignments/biogenesis_SRP040525/SRP040525_sa_list_alignments_piRNAbaseplus15_list.txt", header = FALSE, stringsAsFactors = FALSE)
+all_reads$piRBase <- ifelse((rownames(all_reads) %in% piRBase |  rownames(all_reads) %in% piRNAdata$V1 | rownames(all_reads) %in% piRNASRP$V1), 1,0)
+
+all_reads$`GSC and non-GSCs` <- ifelse(rownames(all_reads) %in% data, 1,0)
+all_reads$`Chen et al. Stem and non-Stem Neural` <- ifelse(rownames(all_reads) %in% SRP040525, 1,0)
+#all_reads$brain <- ifelse(rownames(all_reads) %in% brain, ifelse(rownames(all_reads) %in% top_25_33$sRNA, 1,-1), 0)
+#all_reads$testis <- ifelse(rownames(all_reads) %in% testis, T, F)
+
+
+pdf("../../figures/shared_piRNA_venndiagram.pdf", 6,4)
+print(
+
+vennDiagram( all_reads, include = c("up"), show.include = FALSE, cex = 1)
+)
+dev.off()
+
+rm(top_25_33)
+rm(og)
+rm(rRNA)
+
+```
+
+
+
+**Predicted Targets**
+
+Code showing counts for predicted piRNA targets.
+
+```{r targeting_stats}
+
+
+
+#import the desired read counts
+read_counts <- read.delim("../sRNA_counts/small_sa_og_norRNA_", sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
+read_counts <- read_counts[,4:19]
+
+
+#selecting only the stem diff samples
+total_counts <- total_counts[!(total_counts$line %in%  c("4121_piwil1", "4121_piwil2", "4121_IP", "hNP1_old", "hNP1_new", "17231", "16157", "1123++","528++","1123-", "528-")),] 
+filters <- list.files("../data/targeting_lists/", full.names = TRUE)
+titles <- c( "3' UTR","cDNA", "CDS", "Repeat \n Sequences", "RefSeq \n Geneomic", "Promoter")
+
+
+
+
+  #create a dataframe of the biogenesis
+  df <- as.data.frame(matrix(nrow = 16, ncol = 1, total_counts$sa_og_norRNA_25_33_noncRNA_norepeat, byrow = TRUE))
+  colnames(df) <- "total_piRNA"
+  df$cell_line <- c("387++","456++","3359++","3691++","3832++","4121++","4302++","H2S++","387-","456-","3359-","3691-","3832-","4121-","4302-","H2S-")
+  df$cell_type <- factor(c(rep("stem", 8), (rep("diff",8))), levels= c("stem", "diff"))
+  #df$RP_piRNA <- total_counts$sa_og_norRNA_25_33_noncRNA_repeat
+
+   temp <- df
+    df$piRNA <- "Unique piRNA"
+    temp$piRNA <- "RD piRNA"
+    df$total_piRNA <- total_counts$putative_piRNA
+    temp$total_piRNA <- total_counts$putative_RP_piRNA
+  
+
+  
+  #join all the biogenesis counts together
+  for(n in 1:6){
+    
+   
+    unique <- read.table("../data/small_sa_og_norRNA_25_33_list_unique_mapping_genome_v0_m1.txt", header = FALSE, stringsAsFactors = FALSE)
+    temp_counts <- read_counts[(rownames(read_counts) %in% unique$V1),]
+    #remove low counts
+    #temp_counts <- temp_counts[rowSums(temp_counts > 1) >= 6,]
+    
+    
+    
+    
+    #shorten the reads
+    temp_counts$short <- strtrim(rownames(temp_counts),21)
+    temp_counts <- aggregate(. ~ short, data = temp_counts, FUN = sum, na.rm = TRUE)
+    rownames(temp_counts) <- temp_counts$short
+    temp_counts <- subset(temp_counts, select = -short)
+    
+    
+    filter <- read.table(filters[n], header = FALSE, stringsAsFactors = FALSE)
+    #print(file)
+    column_sums <- as.data.frame(colSums(temp_counts[rownames(temp_counts) %in% filter$V1,]))
+    rownames(column_sums) <- c("387++","456++","3359++","3691++","3832++","4121++","4302++","H2S++","387-","456-","3359-","3691-","3832-","4121-","4302-","H2S-")
+    colnames(column_sums) <- titles[n]
+      
+
+  
+    df <- cbind(df,column_sums)
+    
+  }
+   
+  for(n in 1:6){ 
+       
+    unique <- read.table("../data/small_sa_og_norRNA_25_33_list_unique_mapping_genome_v0_m1.txt", header = FALSE, stringsAsFactors = FALSE)
+    temp_counts <- read_counts[!(rownames(read_counts) %in% unique$V1),]
+    #remove low counts
+    #temp_counts <- temp_counts[rowSums(temp_counts > 1) >= 6,]
+    
+    
+    
+    
+    #shorten the reads
+    temp_counts$short <- strtrim(rownames(temp_counts),21)
+    temp_counts <- aggregate(. ~ short, data = temp_counts, FUN = sum, na.rm = TRUE)
+    rownames(temp_counts) <- temp_counts$short
+    temp_counts <- subset(temp_counts, select = -short)
+    
+    
+    filter <- read.table(filters[n], header = FALSE, stringsAsFactors = FALSE)
+    #print(file)
+    column_sums <- as.data.frame(colSums(temp_counts[rownames(temp_counts) %in% filter$V1,]))
+    rownames(column_sums) <- c("387++","456++","3359++","3691++","3832++","4121++","4302++","H2S++","387-","456-","3359-","3691-","3832-","4121-","4302-","H2S-")
+    colnames(column_sums) <-titles[n]
+      
+
+    
+  
+    temp <- cbind(temp,column_sums)
+    
+  }
+  
+  
+  df <- rbind(df, temp)
+  
+  
+#plots
+  
+# Counts based on phenotype and piRNA type
+temp <- melt(data = df[,-c(1)], id.vars = c(1,2,3))
+
+
+#pdf("../../figures/Boxplot_count_target_predictions.pdf", 6, 6)
+
+ggplot(data = temp[(temp$variable %in% c("3' UTR", "cDNA", "Repeat \n Sequences")), ]) +
+  geom_boxplot(aes(y = log(value), x = variable, color = piRNA, fill = cell_type)) +
+  labs(title = "piRNA with Predicted Target") +
+  ylab("Log2 Counts of piRNA") +
+  xlab("Predicted Target") +
+  #scale_y_continuous(labels = comma, breaks = c(0, 25000, 50000, 75000, 100000, 125000, 150000)) +
+    scale_color_manual(values = c("grey", "black"), breaks = c("RD piRNA", "Unique piRNA"), labels = c("RD piRNA", "Unique\nMapping\npiRNA")) +
+scale_fill_brewer(name = "Phenotype", labels = c("GSC", "Non-GSC"), breaks = c("stem", "diff")) +                  
+  #scale_color_brewer(values = c(""))
+  #scale_x_discrete(angle = 45) +
+  
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    legend.position = "bottom"
+    #legend.position = c(.9, .2),
+    #legend.background = element_blank(),
+     # legend.key.height = unit(x = .1, "cm"),
+    #legend.key.width = unit(x = .05, "cm")
+  )
+
+#dev.off()
+
+
+  
+  
+  #targets based on phenotype
+
+temp <- melt(data = df[,-c(1,4)], id.vars = c(1,2))
+
+temp <- aggregate(data = temp, value ~ cell_line + cell_type+variable, sum)
+
+#pdf("../../figures/Boxplot_target_phenotype.pdf", 6, 4)
+
+
+
+ggplot(data = temp[(temp$variable %in% c("3' UTR", "cDNA", "Repeat \n Sequences", "Promoter")), ]) +
+#ggplot(data = temp) + 
+ geom_boxplot(aes(y = value, x = variable, fill = cell_type)) +
+  labs(title = "Counts of piRNA with Predicted Target") +
+  ylab("Counts of piRNA with Biogenesis Sequence") +
+  xlab("Unique Mapping piRNA and Repeat Mapping piRNA against Biogenesis Sequence") +
+  #scale_y_continuous(labels = comma, breaks = c(0, 25000, 50000, 75000, 100000, 125000, 150000)) +
+scale_fill_brewer(name = "Phenotype", labels = c("Stem", "Non-\nstem-\nlike"), breaks = c("stem", "diff")) +   theme_bw() +
+  scale_color_manual(values = c("grey", "black")) +
+  
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank()
+  )
+
+  
+  
+#dev.off()
+
+
+
+#counts based on piRNA type
+
+temp <- melt(data = df[,-c(1,3)], id.vars = c(1,2))
+
+#pdf("../../figures/Boxplot_count_target_predictions.pdf", 6, 4)
+
+ggplot(data = temp[(temp$variable %in% c("3' UTR", "cDNA", "Repeat \n Sequences", "Promoter")), ]) +
+  geom_boxplot(aes(y = value, x = variable, fill = piRNA)) +
+  labs(title = "Boxplot of Counts of piRNA with Predicted Target") +
+  ylab("Counts of piRNA with Biogenesis Sequence") +
+  xlab("Unique Mapping piRNA and Repeat Mapping piRNA against Biogenesis Sequence") +
+  #scale_y_continuous(labels = comma, breaks = c(0, 25000, 50000, 75000, 100000, 125000, 150000)) +
+  scale_fill_manual(name = "Phenotype",
+                     values = c("darkblue","lightblue")) +
+  scale_color_manual(values = c("grey", "black")) +
+  #scale_color_brewer(values = c(""))
+  #scale_x_discrete(angle = 45) +
+  
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank()
+  )
+
+#dev.off()
+
+
+#predicted targets based on percentage of total reads
+
+
+temp <- subset(df, select = c(total_piRNA, piRNA, `3' UTR`, cDNA, Promoter))
+temp[,c(3,4,5)] <- (temp[,c(3,4,5)]/temp[,1])*100
+#PERCENTAGE BOXPLOTS
+temp <- melt(data = temp[,-c(1)], id.vars = c(1))
+
+
+ggplot(data = temp[(temp$variable %in% c("3' UTR", "cDNA", "Promoter")), ]) +
+#ggplot(data = temp) + 
+ geom_boxplot(aes(y = value, x = variable, color = piRNA)) +
+  labs(title = "Percentages of piRNA with Predicted Target") +
+  ylab("Counts of piRNA with Biogenesis Sequence") +
+  xlab("Target Sequence") +
+  #scale_y_continuous(labels = comma, breaks = c(0, 25000, 50000, 75000, 100000, 125000, 150000)) +
+  scale_fill_manual(name = "Phenotype",
+                     values = c("darkblue","lightblue")) +
+  scale_color_manual(values = c("grey", "black")) +
+  #scale_color_brewer(values = c(""))
+  #scale_x_discrete(angle = 45) +
+  
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank()
+    #legend.position = c(.9, .2),
+    #legend.background = element_blank(),
+     # legend.key.height = unit(x = .1, "cm"),
+    #legend.key.width = unit(x = .05, "cm")
+  )
+
+
+#targets based on percentage of total reads for PHENOTYPE and pIRNA TYPE
+
+temp <- subset(df, select = c(total_piRNA,cell_type, piRNA, `3' UTR`, cDNA, Promoter))
+temp[,c(4,5,6)] <- (temp[,c(4,5,6)]/temp[,1])*100
+#PERCENTAGE BOXPLOTS
+temp <- melt(data = temp[,-c(1)], id.vars = c(1,2))
+
+
+#pdf("../../figures/Boxplot_percentage_target_phenotype_piRNA.pdf", 6, 6)
+
+ggplot(data = temp[(temp$variable %in% c("3' UTR", "cDNA", "Promoter")), ]) +
+#ggplot(data = temp) + 
+ geom_boxplot(aes(y = value, x = variable, color = piRNA, fill = cell_type)) +
+  labs(title = "Percentages of piRNA with Predicted Target") +
+  ylab("Counts of piRNA with Biogenesis Sequence") +
+  xlab("Target Sequence") +
+  #scale_y_continuous(labels = comma, breaks = c(0, 25000, 50000, 75000, 100000, 125000, 150000)) +
+  scale_fill_manual(name = "Phenotype",
+                     values = c("darkblue","lightblue"), labels = c("non-stem \n GBM", "GSC")) +
+  scale_color_manual(values = c("black", "grey")) +
+  #scale_color_brewer(values = c(""))
+  #scale_x_discrete(angle = 45) +
+  
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    legend.position = "bottom"
+    #legend.background = element_blank(),
+     # legend.key.height = unit(x = .1, "cm"),
+    #legend.key.width = unit(x = .1, "cm")
+  )
+
+
+
+
+#dev.off()
+
+
+
+
+
+```
+
+**piRNA Found in Clusters**
+
+Code to find piRNAidentified in a cluster.
+
+```{r piRNA_from_clusters, eval=FALSE}
+
+#load the proTRAC files
+protrac_folder <- "../proTRAC_files/clusters_minimum_1000/stem_diff"
+file_names <- list.files(protrac_folder)
+file_names <- strtrim(file_names, 9)
+
+
+files <- list.files(protrac_folder, full.names = TRUE, recursive = TRUE, pattern = ".fasta")
+files <- files[-grep(files, pattern = "clusters.fasta")]
+
+
+piRNAfromClusters <- function(file){
+  fasta <- readDNAStringSet(file)
+  return(as.character(fasta, use.names = FALSE))
+
+}
+
+piRNA <- lapply(X = files, FUN =piRNAfromClusters)
+piRNA <- unlist(piRNA)
+piRNA <- unique(piRNA)
+#piRNA <- unlist(lapply(piRNA, FUN = strtrim,21))
+piRNA <- unique(piRNA)
+
+
+read_counts <- read_counts[rownames(read_counts) %in% piRNA,]
+
+#write.table(rownames(read_counts), "../data/biogenesis_lists/sa_og_norRNA_25_33_inClusters_list.txt", quote = F, row.names = F, col.names = F)
+```
+
+
+

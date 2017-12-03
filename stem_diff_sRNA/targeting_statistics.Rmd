@@ -1,0 +1,413 @@
+---
+title: "Targeting Statistics"
+author: "Andrew Burr"
+date: "April 24, 2017"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+
+require(limma)
+require(knitr)
+require(edgeR)
+require(biomaRt)
+require(DESeq2)
+require(edgeR)
+require(ggplot2)
+require(reshape)
+require(reshape2)
+require(stringdist)
+require(apcluster)
+require(qqman)
+require(Biostrings)
+require(motifRG)
+require(stringr)
+require(scales)
+require(ggrepel)
+
+
+conversion <- read.csv("../../reference_sets/ensembl_to_hgnc.txt", stringsAsFactors=FALSE)
+options(scipen=999)
+
+
+#create a fasta file from a list of sequences
+createpiRNAFasta <- function(fileName, extension){
+  
+  #read in the old file
+  fileText <- readLines(con  =fileName)
+  
+  newText <-vector(length = length(fileText)*2)
+  
+  #change name
+  n <- 1
+  for(line in seq(1,length(newText),2)){
+    #the fasta sequence to be inverted
+    sequence <- fileText[n]
+    #go to each letter and switch it
+    newText[line] <- paste(">",sequence, sep = "") 
+    n <- n + 1
+  }
+  
+  n <- 1
+  for(line in seq(2,length(newText),2)){
+    sequence <- fileText[n]
+    #go to each letter and switch it
+    newText[line] <- sequence
+    n <- n + 1
+  }
+  
+  return(newText)
+  #write.table(derp, "test.fa", sep = "\t", row.names = FALSE, col.names = FALSE, quote = FALSE)
+}
+
+
+
+removeRepeats <- function(read_counts){
+
+tRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_tRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+lncRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_lncRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+unique <- read.table("../alignments/small_sa_og_norRNA_alignments_uniquemapping_list.txt", header = FALSE, stringsAsFactors = FALSE)
+piRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_piRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+YRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_YRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+snoRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_snoRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+miRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_miRNA.txt", header = FALSE, stringsAsFactors = FALSE, sep = "\t")
+rmsk_plus40 <- read.table("../alignments/small_sa_og_norRNA_alignments_repeatmasker_plus40.txt", header = FALSE, stringsAsFactors = FALSE)
+rmsk_plus40_tRNA <- rmsk_plus40[grepl(pattern = "tRNA", rmsk_plus40$V2),]
+rmsk <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_repeatmasker.txt", header = FALSE, stringsAsFactors = FALSE, sep = "\t")
+
+rmsk$Family <- ifelse(grepl("tRNA", rmsk$V2), "tRNA", 
+                             ifelse(grepl(")n", rmsk$V2), "Simple", 
+                                    ifelse(grepl("Alu", rmsk$V2), "Alu", 
+                                           ifelse(rmsk$V2 %in% c("U1", "U2", "U3", "U4", "U5", "U6", "U7", "U8"), "U", 
+                                                  ifelse(grepl("HY", rmsk$V2), "Y-RNA", 
+                                                         ifelse(grepl(pattern =  paste(c("L1", "L2", "L3", "L4", "L5", "L6"), collapse = "|"), rmsk$V2), "LINE", 
+                                                                ifelse(grepl("MIR", rmsk$V2), "MIR", "other" )))))))
+
+rmsk$Family[rmsk$V2 == "5S"] <- "5S"
+rmsk$Family[rmsk$V2 == "7SLRNA"] <- "7SLRNA"
+rmsk$Family[rmsk$V2 == "7SK"] <- "7SK"
+
+
+
+
+
+
+#read_counts <- read_counts[!(rownames(read_counts) %in% tRNA$V1),]
+#read_counts <- read_counts[!(rownames(read_counts) %in% lncRNA$V1),]
+read_counts <- read_counts[!(rownames(read_counts) %in% YRNA$V1),]
+read_counts <- read_counts[!(rownames(read_counts) %in% snoRNA$V1),]
+read_counts <- read_counts[!(rownames(read_counts) %in% rmsk$V1[rmsk$Family == "Simple"]),]
+read_counts <- read_counts[!(rownames(read_counts) %in% rmsk$V1[rmsk$Family == "Alu"]),]
+read_counts <- read_counts[!(rownames(read_counts) %in% rmsk$V1[rmsk$Family == "5S"]),]
+read_counts <- read_counts[!(rownames(read_counts) %in% rmsk$V1[rmsk$Family == "7SLRNA"]),]
+read_counts <- read_counts[!(rownames(read_counts) %in% rmsk$V1[rmsk$Family == "7SK"]),]
+
+return(read_counts)
+}
+
+
+
+```
+
+
+```{r repeat_setup}
+
+#system("grep -f ../data/temp_read_names.txt ../alignments/list_targeting/small_sa_og_norRNA_25_33_25bp_targeting_repeat_bt2v1score4_trimmed.txt > ../data/repeat_temp_alignments_bt2v1score4.txt" )
+#system("grep -f ../data/temp_read_names.txt ../alignments/list_targeting/small_sa_og_norRNA_25_33_25bp_targeting_repeat_bt2v1score2_trimmed.txt > ../data/repeat_temp_alignments_bt2v1score2.txt" )
+#system("grep -f ../data/temp_read_names.txt ../alignments/list_targeting/small_sa_og_norRNA_25_33_25bp_targeting_repeat_bt2v1score6_trimmed.txt > ../data/repeat_temp_alignments_bt2v1score6.txt" )
+
+#system("grep -f ../data/temp_read_names.txt ../alignments/list_targeting/small_sa_og_norRNA_25_33_25bp_targeting_cDNA_bt2v1score2_trimmed.txt > ../dacDNA_temp_alignments_bt2v1score2.txt" )
+#system("grep -f ../data/temp_read_names.txt ../alignments/list_targeting/small_sa_og_norRNA_25_33_25bp_targeting_cDNA_bt2v1score4_trimmed.txt > ../dacDNA_temp_alignments_bt2v1score4.txt" )
+#system("grep -f ../data/temp_read_names.txt ../alignments/list_targeting/small_sa_og_norRNA_25_33_25bp_targeting_cDNA_bt2v1score6_trimmed.txt > ../data/cDNA_temp_alignments_bt2v1score6.txt" )
+
+
+
+
+
+#loads the targeting sequences expressionts
+targeting_sRNA <- read.table("../data/targeting_sRNA.csv", stringsAsFactors = F, header  = T, sep = ",")
+targeting_top_sRNA <- read.table("../data/top_targeting_sRNA.csv", stringsAsFactors = F, header  = T, sep = ",")
+gene_expression <- read.csv("../../RNAseq/data/StemVsDiff_all_DE_genes.txt", sep = ",", stringsAsFactors = F)
+top_genes <- read.csv("../../RNAseq/data/StemVsDiff_top_DE_genes.txt", stringsAsFactors=FALSE)
+
+conversion <- read.table("../../reference_sets/ensembl_conversion.txt", header = T, stringsAsFactors = F, sep = "\t")
+
+
+
+repeat_alignments <- list()
+repeat_alignments[[1]] <-  read.delim("../data/repeat_temp_alignments_bt2v1score2.txt", header=FALSE, stringsAsFactors=FALSE)[,]
+repeat_alignments[[2]] <-  read.delim("../data/repeat_temp_alignments_bt2v1score4.txt", header=FALSE, stringsAsFactors=FALSE)[,]
+repeat_alignments[[3]] <-  read.delim("../data/repeat_temp_alignments_bt2v1score6.txt", header=FALSE, stringsAsFactors=FALSE)[,]
+
+
+
+
+cDNA_alignments <- list()
+cDNA_alignments[[1]] <-  read.delim("../data/cDNA_temp_alignments_bt2v1score2.txt", header=FALSE, stringsAsFactors=FALSE)[,]
+cDNA_alignments[[2]] <-  read.delim("../data/cDNA_temp_alignments_bt2v1score4.txt", header=FALSE, stringsAsFactors=FALSE)[,]
+cDNA_alignments[[3]] <-  read.delim("../data/cDNA_temp_alignments_bt2v1score6.txt", header=FALSE, stringsAsFactors=FALSE)[,]
+
+
+UTR_alignments <- list()
+UTR_alignments[[1]] <-  read.delim("../data/3UTR_temp_alignments_bt2v1score2.txt", header=FALSE, stringsAsFactors=FALSE)[,]
+UTR_alignments[[2]] <-  read.delim("../data/3UTR_temp_alignments_bt2v1score4.txt", header=FALSE, stringsAsFactors=FALSE)[,]
+UTR_alignments[[3]] <-  read.delim("../data/3UTR_temp_alignments_bt2v1score6.txt", header=FALSE, stringsAsFactors=FALSE)[,]
+
+
+
+
+
+
+alignment_names <- c("Score -2", "Score -4" , "Score -6")
+
+
+stats <- as.data.frame(matrix(ncol = 1,nrow = length(alignment_names)))
+colnames(stats) <- "Target"
+stats$names <- alignment_names
+#rownames(stats) <- alignment_names
+
+```
+
+
+
+
+```{r repeat_targeting_statistics}
+
+repeat_stats <-  stats
+repeat_stats$Target <- "Repeat"
+
+for(alignments_number in 1:length(repeat_alignments)){
+  alignments <- as.data.frame(repeat_alignments[[alignments_number]])
+  name <- alignment_names[alignments_number]
+  
+  repeat_stats[name == repeat_stats$names, "Targeting Sequence with Alignment"] <- length(unique(alignments$V1[alignments$V1 %in% targeting_sRNA$sRNA]))
+  repeat_stats[name == repeat_stats$names, "DE Targeting Sequence with Alignment"] <- length(unique(alignments$V1[alignments$V1 %in% targeting_top_sRNA$sRNA]))
+  repeat_stats$total_alignments[name == repeat_stats$names] <- nrow(alignments)
+  repeat_stats$unique_targets[name == repeat_stats$names] <- length(unique(alignments$V2))
+  repeat_stats$DE_total_alignments[name == repeat_stats$names] <- nrow(alignments[alignments$V1 %in% targeting_top_sRNA$sRNA,])
+  repeat_stats$DE_unique_targets[name == repeat_stats$names] <- length(unique(alignments$V2[alignments$V1 %in% targeting_top_sRNA$sRNA]))
+}
+
+
+```
+
+
+```{r cDNA_targeting_statistics}
+
+cDNA_stats <-  stats
+cDNA_stats$Target <- "mRNA"
+
+for(alignments_number in 1:length(cDNA_alignments)){
+  alignments <- as.data.frame(cDNA_alignments[[alignments_number]])
+  name <- alignment_names[alignments_number]
+
+  cDNA_stats[name == cDNA_stats$names, "Targeting Sequence with Alignment"] <- length(unique(alignments$V1[alignments$V1 %in% targeting_sRNA$sRNA]))
+  cDNA_stats[name == cDNA_stats$names, "DE Targeting Sequence with Alignment"] <- length(unique(alignments$V1[alignments$V1 %in% targeting_top_sRNA$sRNA]))
+  cDNA_stats$total_alignments[name == cDNA_stats$names] <- nrow(alignments)
+  cDNA_stats$unique_targets[name == cDNA_stats$names] <- length(unique(alignments$V2))
+  cDNA_stats$DE_total_alignments[name == cDNA_stats$names] <- nrow(alignments[alignments$V1 %in% targeting_top_sRNA$sRNA,])
+  cDNA_stats$DE_unique_targets[name == cDNA_stats$names] <- length(unique(alignments$V2[alignments$V1 %in% targeting_top_sRNA$sRNA]))
+}
+
+
+
+```
+
+
+
+```{r 3UTR_targeting_statistics}
+
+UTR_stats <-  stats
+UTR_stats$Target <- "UTR"
+
+for(alignments_number in 1:length(UTR_alignments)){
+  alignments <- as.data.frame(UTR_alignments[[alignments_number]])
+  name <- alignment_names[alignments_number]
+
+  UTR_stats[name == UTR_stats$names, "Targeting Sequence with Alignment"] <- length(unique(alignments$V1[alignments$V1 %in% targeting_sRNA$sRNA]))
+  UTR_stats[name == UTR_stats$names, "DE Targeting Sequence with Alignment"] <- length(unique(alignments$V1[alignments$V1 %in% targeting_top_sRNA$sRNA]))
+  UTR_stats$total_alignments[name == UTR_stats$names] <- nrow(alignments)
+  UTR_stats$unique_targets[name == UTR_stats$names] <- length(unique(alignments$V2))
+  UTR_stats$DE_total_alignments[name == UTR_stats$names] <- nrow(alignments[alignments$V1 %in% targeting_top_sRNA$sRNA,])
+  UTR_stats$DE_unique_targets[name == UTR_stats$names] <- length(unique(alignments$V2[alignments$V1 %in% targeting_top_sRNA$sRNA]))
+}
+
+
+
+```
+
+
+```{r plot}
+
+all_stats <- rbind(repeat_stats, cDNA_stats)
+all_stats <- rbind(all_stats, UTR_stats)
+
+all_stats <- melt(data = all_stats[,1:4], id.vars = c('Target', 'names' ), variable_name = "piRNA")
+colnames(all_stats)[3] <- "piRNA"
+
+pdf("../../figures/targeting_line.pdf", 6,4)
+print(
+  
+ggplot() +
+  #ggtitle("piRNA with Targets") +
+  xlab("Targeting Scoring Function") + 
+  ylab("Number of Targeting Sequences with Target") + 
+  geom_line(data = all_stats, aes(x = names, y = value , group = interaction(Target, piRNA), color = Target, linetype = piRNA)) +
+ # geom_line(data = all_stats[all_stats$variable == 'piRNA with Alignment' ,], aes(x = names, y = value , color = Target, group = Target), linetype = 1) +
+  # geom_line(data = all_stats[all_stats$variable == 'DE piRNA with Alignment' ,], aes(x = names, y = value , color = Target, group = Target),linetype = 2) +
+  scale_linetype_manual(labels = c("All Targeting\nSequences", 'Differentially\nExpressed\nTargeting\nSequences'), values = c(1,2), breaks = c("Targeting Sequence with Alignment","DE Targeting Sequence with Alignment")) +
+  theme_bw()+
+   theme(legend.key.height = unit(1.3,"cm"))
+
+)
+
+dev.off()
+
+
+```
+
+
+
+**Ping Pong Calculation**
+
+The ping-pong method asserts that piRNA generated from the method will have a base pair biase at the 1 and 10 position. Conflicting studies have shown that this method is and is not present in mRNA silencing. This code finds piRNA reads that aligned to mRNA as a possible point of biogenesis and finds mRNA sequences that had a targeting piRNA. The end result are piRNA sequenences that could haev been generated from the ping-pong method targeting mRNA sequences. These sequences were analyzed with MEME later.
+
+
+
+```{r repeat_piRNA_pingpong}
+
+
+for(alignments_number in 1:length(repeat_alignments)){
+  alignments <- as.data.frame(repeat_alignments[[alignments_number]])
+  name <- alignment_names[alignments_number]
+  
+  colnames(alignments) <- c("ping", "transcript_id", "bp_start", "alignment_info", "mismatches")
+  
+  
+  alignments <- unique(alignments)
+
+alignments$V1[alignments$V1 %in% targeting_sRNA$sRNA]
+
+#find piRNA with a predicted mRNA target
+ping <- unique(subset(alignments, select = c(ping, transcript_id)))
+
+#loading in the bowtie alignments for predicted biogenesis from cDNA
+pong <- read.delim("../alignments/biogenesis_alignments_norRNA_25_33/small_sa_og_norRNA_alignments_repeatmasker.txt", header=FALSE, stringsAsFactors=FALSE)[,]
+colnames(pong) <- c("pong", "transcript_id")
+
+pingpong <- merge(ping,pong, by = "transcript_id")
+
+pingpong$ping <- strtrim(pingpong$ping, 10)
+pingpong$pong <- strtrim(pingpong$pong, 10)
+
+
+#create the reverse complementary of th einput fasta file
+revComp <- function(sequence){
+    #go to each letter and switch it
+    sequence <- unlist(strsplit(sequence, split = ""))
+    for(letterPosition in 1:length(sequence)){
+      #keep track of the original letter
+      oldLetter <- sequence[letterPosition]
+      newLetter <- oldLetter
+      if(oldLetter == "C"){
+        newLetter <- "G"
+      }
+      if(oldLetter == "G"){
+        newLetter <- "C"
+      }
+      if(oldLetter == "T"){
+        newLetter <- "A"
+      }
+      if(oldLetter == "A"){
+        newLetter <- "T"
+      }
+       if(oldLetter == "N"){
+        newLetter <- "N"
+      }
+      sequence[letterPosition] <- newLetter
+    }
+    sequence <- rev(strsplit(sequence, split = ""))
+    return(paste(sequence, collapse = ""))
+}
+
+
+
+pingpong$ping <- sapply(X = pingpong$ping, FUN = revComp)
+
+pingpong$value <- ifelse(pingpong$ping == pingpong$pong, T,F)
+
+#repeat_stats[name, "pingpong"] <- length(pingpong$value == TRUE)/length(pingpong$value == FALSE)
+}
+```
+
+
+
+```{r cDNA_piRNA_pingpong}
+
+
+for(alignments_number in 1:length(cDNA_alignments)){
+  
+  alignments <- as.data.frame(cDNA_alignments[[alignments_number]])
+  name <- alignment_names[alignments_number]
+  
+  colnames(alignments) <- c("ping", "transcript_id", "bp_start", "alignment_info", "mismatches")
+  alignments$transcript_id <- gsub(pattern = "\\..*", replacement = "", alignments$transcript_id)
+  
+  alignments <- merge(alignments, conversion, by = "transcript_id" )
+  
+  alignments <- unique(alignments)
+
+alignments$V1[alignments$V1 %in% targeting_sRNA$sRNA]
+
+#find piRNA with a predicted mRNA target
+ping <- unique(subset(alignments, select = c(ping, transcript_id)))
+
+#loading in the bowtie alignments for predicted biogenesis from cDNA
+pong <- read.delim("../alignments/biogenesis_alignments_norRNA_25_33/small_sa_og_norRNA_25_33_list_alignments_cDNA_list.txt", header=FALSE, stringsAsFactors=FALSE)[,]
+colnames(pong) <- c("pong", "transcript_id")
+pong$transcript_id <- gsub(pattern = "\\..*", replacement = "", pong$transcript_id)
+
+pingpong <- merge(ping,pong, by = "transcript_id")
+
+pingpong$ping <- strtrim(pingpong$ping, 10)
+pingpong$pong <- strtrim(pingpong$pong, 10)
+
+
+#create the reverse complementary of th einput fasta file
+revComp <- function(sequence){
+    #go to each letter and switch it
+    sequence <- unlist(strsplit(sequence, split = ""))
+    for(letterPosition in 1:length(sequence)){
+      #keep track of the original letter
+      oldLetter <- sequence[letterPosition]
+      newLetter <- oldLetter
+      if(oldLetter == "C"){
+        newLetter <- "G"
+      }
+      if(oldLetter == "G"){
+        newLetter <- "C"
+      }
+      if(oldLetter == "T"){
+        newLetter <- "A"
+      }
+      if(oldLetter == "A"){
+        newLetter <- "T"
+      }
+       if(oldLetter == "N"){
+        newLetter <- "N"
+      }
+      sequence[letterPosition] <- newLetter
+    }
+    sequence <- rev(strsplit(sequence, split = ""))
+    return(paste(sequence, collapse = ""))
+}
+
+
+
+pingpong$ping <- sapply(X = pingpong$ping, FUN = revComp)
+
+pingpong$value <- ifelse(pingpong$ping == pingpong$pong, T,F)
+cDNA_stats[name, "pingpong"] <- sum(pingpong$value == TRUE)/sum(pingpong$value == FALSE)
+}
+```
