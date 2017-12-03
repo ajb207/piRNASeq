@@ -105,7 +105,6 @@ system("grep -f ../data/temp_read_names.txt ../alignments/list_targeting/small_s
 
 
 
-#system("grep -f ../data/temp_read_names.txt ../data/repeat_temp_alignments_bt2v1score2.txt > ../data/temp.txt; cat ../data/temp.txt > ../data/repeat_temp_alignments_bt2v1score2.txt")
 system("grep -f ../data/temp_read_names.txt ../alignments/list_targeting/small_sa_og_norRNA_25_33_25bp_targeting_repeat_bt2v1score2_trimmed.txt > ../data/repeat_temp_alignments_bt2v1score2.txt")
 system("grep -f ../data/temp_read_names.txt ../alignments/list_targeting/small_sa_og_norRNA_25_33_25bp_targeting_repeat_bt2v1score4_trimmed.txt > ../data/repeat_temp_alignments_bt2v1score4.txt" )
 system("grep -f ../data/temp_read_names.txt ../alignments/list_targeting/small_sa_og_norRNA_25_33_25bp_targeting_repeat_bt2v1score6_trimmed.txt > ../data/repeat_temp_alignments_bt2v1score6.txt" )

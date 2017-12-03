@@ -60,8 +60,6 @@ cDNA_alignments <- list()
 cDNA_alignments[[1]] <-  read.delim("../../data_files/stem_diff_alignments/temp_alignments/cDNA_temp_alignments_bt2v1score2.txt", header=FALSE, stringsAsFactors=FALSE)[,]
 cDNA_alignments[[2]] <-  read.delim("../../data_files/stem_diff_alignments/temp_alignments/cDNA_temp_alignments_bt2v1score4.txt", header=FALSE, stringsAsFactors=FALSE)[,]
 cDNA_alignments[[3]] <-  read.delim("../../data_files/stem_diff_alignments/temp_alignments/cDNA_temp_alignments_bt2v1score6.txt", header=FALSE, stringsAsFactors=FALSE)[,]
-#cDNA_alignments[[4]] <-  read.delim("../data/cDNA_temp_alignments_bt2v1score8.txt", header=FALSE, stringsAsFactors=FALSE)[,]
-#cDNA_alignments[[5]] <-  read.delim("../data/cDNA_temp_alignments_bt2v1score10.txt", header=FALSE, stringsAsFactors=FALSE)[,]
 
 
 
