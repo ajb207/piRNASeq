@@ -395,12 +395,13 @@ fit <-
   eBayes(
     lmFit(object = es,
           design =  design))
-all <- topTable(fit = fit,
-                coef = 5,
-                sort.by = "p", 
-                number = "all", 
-                lfc = 0, 
-                p.value = 1) %>%
+all <- 
+  topTable(fit = fit,
+           coef = 5,
+           sort.by = "p", 
+           number = "all", 
+           lfc = 0, 
+           p.value = 1) %>%
   subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value))
 
 
@@ -423,28 +424,30 @@ write.table(x = top    ,
             sep = "\t",
             row.names = F,
             quote = T)
-all <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value),
-              x = topTable(fit, 
-                           coef = 4, 
-                           sort.by = "p",
-                           number = "all", 
-                           lfc = 0, 
-                           p.value = 1)
-              )
-top <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value),
-              x = topTable(fit,
-                           coef = 4,
-                           sort.by = "p", 
-                           number = "all",
-                           lfc = 0, 
-                           p.value = .05)
-              )
-write.table(all    ,
+all <- 
+  topTable(fit = fit, 
+           coef = 4, 
+           sort.by = "p",
+           number = "all", 
+           lfc = 0, 
+           p.value = 1) %>%
+  subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value))
+
+top <-
+  topTable(fit = fit,
+           coef = 4,
+           sort.by = "p", 
+           number = "all",
+           lfc = 0, 
+           p.value = .05) %>% 
+  subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value))
+
+write.table(x = all    ,
             file =  ".../../data_files/microarray_expressed_genes/Piwil1_knockdown_B_differentially_expressed_transcripts.txt", 
             sep = "\t",
             row.names = F,
             quote = T)
-write.table(top    ,
+write.table(x = top    ,
             file = "../../data_files/microarray_expressed_genes/Piwil1_knockdown_B_top_pval05_differentially_expressed_transcripts.txt",
             sep = "\t",
             row.names = F, 
@@ -534,45 +537,46 @@ write.table(x = top    ,
 ```{r individual_samples}
 
 # calculate and write the expressions for an individual experiment
-IndividualExpressions <- function(expression_set_path, output_dir = "../data/individual_samples_expressions/", cell_prefix, experiment_prefix, coeficient , design ){
-  
-  # load the expression set data 
-  es <- createExpressionSet(expression_set_path) 
-  # mds Plot of the cell lines
-  # cell lines are placed based on typical distances of the top log2 fold changes
-  plotMDS(x = es, 
-          cex = .7, 
-          labels = phenotype)
-  fit <- eBayes(lmFit(es, design))
-  # compute expressions of all gene probes
-  all <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value),
-                x = topTable(fit,
-                             coef = coeficient,
-                             sort.by = "p",
-                             number = "all", 
-                             lfc = 0, 
-                             p.value = 1)
-  )
-  # compute the top gene probes by selected p value
-  top <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value),
-                x = topTable(fit,
-                             coef = coeficient,
-                             sort.by = "p", 
-                             number = "all", 
-                             lfc = 0,
-                             p.value = .05)
-  )
-  write.table(x = all,
-              file = paste0(output_dir,paste(cell_prefix,  experiment_prefix, "differentially_expressed_transcripts.txt", sep = "_")),
-              sep = "\t",
-              row.names = F,
-              quote = F)
-  write.table(x = top, 
-              file = paste0(output_dir, paste(cell_prefix,  experiment_prefix, "top_pval05_differentially_expressed_transcripts.txt", sep = "_")),
-              sep = "\t",
-              row.names = F,
-              quote = F)
-}
+IndividualExpressions <- 
+  function(expression_set_path, output_dir = "../../data_files/microarray_expressed_genes/individual_samples_expressions/", cell_prefix, experiment_prefix, coeficient , design ){
+    
+    # load the expression set data 
+    es <- createExpressionSet(expression_set_path) 
+    # mds Plot of the cell lines
+    # cell lines are placed based on typical distances of the top log2 fold changes
+    plotMDS(x = es, 
+            cex = .7, 
+            labels = phenotype)
+    fit <- eBayes(lmFit(es, design))
+    # compute expressions of all gene probes
+    all <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value),
+                  x = topTable(fit,
+                               coef = coeficient,
+                               sort.by = "p",
+                               number = "all", 
+                               lfc = 0, 
+                               p.value = 1)
+    )
+    # compute the top gene probes by selected p value
+    top <- subset(select = -c(CHROMOSOME,ILMN_GENE,SEARCH_KEY, Status, P.Value),
+                  x = topTable(fit,
+                               coef = coeficient,
+                               sort.by = "p", 
+                               number = "all", 
+                               lfc = 0,
+                               p.value = .05)
+    )
+    write.table(x = all,
+                file = paste0(output_dir,paste(cell_prefix,  experiment_prefix, "differentially_expressed_transcripts.txt", sep = "_")),
+                sep = "\t",
+                row.names = F,
+                quote = F)
+    write.table(x = top, 
+                file = paste0(output_dir, paste(cell_prefix,  experiment_prefix, "top_pval05_differentially_expressed_transcripts.txt", sep = "_")),
+                sep = "\t",
+                row.names = F,
+                quote = F)
+  }
 
 # the design of the experiment. 
 # 12 samples from 3 cell lines and 4 repeats each
@@ -585,12 +589,12 @@ phenotype <-
   )
 design <-model.matrix(~  phenotype )
 
-IndividualExpressions(expression_set_path = "../Experiments/Cell_Line_3691_AE/", cell_prefix = "Piwil1_3691", experiment_prefix = "knockdown_A", coeficient = 2, design = design)
-IndividualExpressions(expression_set_path = "../Experiments/Cell_Line_3691_AE/", cell_prefix = "Piwil1_3691", experiment_prefix = "knockdown_E", coeficient = 3, design = design)
-IndividualExpressions(expression_set_path = "../Experiments/Cell_Line_3832_AE/", cell_prefix = "Piwil1_3832", experiment_prefix = "knockdown_A", coeficient = 2, design = design)
-IndividualExpressions(expression_set_path = "../Experiments/Cell_Line_3832_AE/", cell_prefix = "Piwil1_3832", experiment_prefix = "knockdown_E", coeficient = 3, design = design)
-IndividualExpressions(expression_set_path = "../Experiments/Cell_Line_4121_AE/", cell_prefix = "Piwil1_4121", experiment_prefix = "knockdown_A", coeficient = 2, design = design)
-IndividualExpressions(expression_set_path = "../Experiments/Cell_Line_4121_AE/", cell_prefix = "Piwil1_4121", experiment_prefix = "knockdown_E", coeficient = 3, design = design)
+IndividualExpressions(expression_set_path = "../../data_files/illumina_studio_output/Cell_Line_3691_AE/", cell_prefix = "Piwil1_3691", experiment_prefix = "knockdown_A", coeficient = 2, design = design)
+IndividualExpressions(expression_set_path = "../../data_files/illumina_studio_output/Cell_Line_3691_AE/", cell_prefix = "Piwil1_3691", experiment_prefix = "knockdown_E", coeficient = 3, design = design)
+IndividualExpressions(expression_set_path = "../../data_files/illumina_studio_output/Cell_Line_3832_AE/", cell_prefix = "Piwil1_3832", experiment_prefix = "knockdown_A", coeficient = 2, design = design)
+IndividualExpressions(expression_set_path = "../../data_files/illumina_studio_output/Cell_Line_3832_AE/", cell_prefix = "Piwil1_3832", experiment_prefix = "knockdown_E", coeficient = 3, design = design)
+IndividualExpressions(expression_set_path = "../../data_files/illumina_studio_output/Cell_Line_4121_AE/", cell_prefix = "Piwil1_4121", experiment_prefix = "knockdown_A", coeficient = 2, design = design)
+IndividualExpressions(expression_set_path = "../../data_files/illumina_studio_output/Cell_Line_4121_AE/", cell_prefix = "Piwil1_4121", experiment_prefix = "knockdown_E", coeficient = 3, design = design)
 
 phenotype <- 
   factor(
@@ -601,12 +605,12 @@ phenotype <-
   )
 design <-model.matrix(~  phenotype )
 
-IndividualExpressions(expression_set_path = "../Experiments/Cell_Line_3691_BC/", cell_prefix = "Piwil1_3691", experiment_prefix = "knockdown_B", coeficient = 2, design = design)
-IndividualExpressions(expression_set_path = "../Experiments/Cell_Line_3691_BC/", cell_prefix = "Piwil1_3691", experiment_prefix = "knockdown_C", coeficient = 3, design = design)
-IndividualExpressions(expression_set_path = "../Experiments/Cell_Line_3832_BC/", cell_prefix = "Piwil1_3832", experiment_prefix = "knockdown_B", coeficient = 2, design = design)
-IndividualExpressions(expression_set_path = "../Experiments/Cell_Line_3832_BC/", cell_prefix = "Piwil1_3832", experiment_prefix = "knockdown_C", coeficient = 3, design = design)
-IndividualExpressions(expression_set_path = "../Experiments/Cell_Line_4121_BC/", cell_prefix = "Piwil1_4121", experiment_prefix = "knockdown_B", coeficient = 2, design = design)
-IndividualExpressions(expression_set_path = "../Experiments/Cell_Line_4121_BC/", cell_prefix = "Piwil1_4121", experiment_prefix = "knockdown_C", coeficient = 3, design = design)
+IndividualExpressions(expression_set_path = "../../data_files/illumina_studio_output/Cell_Line_3691_BC/", cell_prefix = "Piwil1_3691", experiment_prefix = "knockdown_B", coeficient = 2, design = design)
+IndividualExpressions(expression_set_path = "../../data_files/illumina_studio_output/Cell_Line_3691_BC/", cell_prefix = "Piwil1_3691", experiment_prefix = "knockdown_C", coeficient = 3, design = design)
+IndividualExpressions(expression_set_path = "../../data_files/illumina_studio_output/Cell_Line_3832_BC/", cell_prefix = "Piwil1_3832", experiment_prefix = "knockdown_B", coeficient = 2, design = design)
+IndividualExpressions(expression_set_path = "../../data_files/illumina_studio_output/Cell_Line_3832_BC/", cell_prefix = "Piwil1_3832", experiment_prefix = "knockdown_C", coeficient = 3, design = design)
+IndividualExpressions(expression_set_path = "../../data_files/illumina_studio_output/Cell_Line_4121_BC/", cell_prefix = "Piwil1_4121", experiment_prefix = "knockdown_B", coeficient = 2, design = design)
+IndividualExpressions(expression_set_path = "../../data_files/illumina_studio_output/Cell_Line_4121_BC/", cell_prefix = "Piwil1_4121", experiment_prefix = "knockdown_C", coeficient = 3, design = design)
 
 
 phenotype <-
@@ -617,12 +621,12 @@ phenotype <-
   )
 design <-model.matrix(~  phenotype )
 
-IndividualExpressions(expression_set_path = "../Experiments/Cell_Line_387_HI/", cell_prefix = "Piwil1_387", experiment_prefix = "knockdown_H", coeficient = 2, design = design)
-IndividualExpressions(expression_set_path = "../Experiments/Cell_Line_387_HI/", cell_prefix = "Piwil1_387", experiment_prefix = "knockdown_I", coeficient = 3, design = design)
-IndividualExpressions(expression_set_path = "../Experiments/Cell_Line_3359_HI/", cell_prefix = "Piwil1_3359", experiment_prefix = "knockdown_H", coeficient = 2, design = design)
-IndividualExpressions(expression_set_path = "../Experiments/Cell_Line_3359_HI/", cell_prefix = "Piwil1_3359", experiment_prefix = "knockdown_I", coeficient = 3, design = design)
-IndividualExpressions(expression_set_path = "../Experiments/Cell_Line_4121_HI/", cell_prefix = "Piwil1_4121", experiment_prefix = "knockdown_H", coeficient = 2, design = design)
-IndividualExpressions(expression_set_path = "../Experiments/Cell_Line_4121_HI/", cell_prefix = "Piwil1_4121", experiment_prefix = "knockdown_I", coeficient = 3, design = design)
+IndividualExpressions(expression_set_path = "../../data_files/illumina_studio_output/Cell_Line_387_HI/", cell_prefix = "Piwil1_387", experiment_prefix = "knockdown_H", coeficient = 2, design = design)
+IndividualExpressions(expression_set_path = "../../data_files/illumina_studio_output/Cell_Line_387_HI/", cell_prefix = "Piwil1_387", experiment_prefix = "knockdown_I", coeficient = 3, design = design)
+IndividualExpressions(expression_set_path = "../../data_files/illumina_studio_output/Cell_Line_3359_HI/", cell_prefix = "Piwil1_3359", experiment_prefix = "knockdown_H", coeficient = 2, design = design)
+IndividualExpressions(expression_set_path = "../../data_files/illumina_studio_output/Cell_Line_3359_HI/", cell_prefix = "Piwil1_3359", experiment_prefix = "knockdown_I", coeficient = 3, design = design)
+IndividualExpressions(expression_set_path = "../../data_files/illumina_studio_output/Cell_Line_4121_HI/", cell_prefix = "Piwil1_4121", experiment_prefix = "knockdown_H", coeficient = 2, design = design)
+IndividualExpressions(expression_set_path = "../../data_files/illumina_studio_output/Cell_Line_4121_HI/", cell_prefix = "Piwil1_4121", experiment_prefix = "knockdown_I", coeficient = 3, design = design)
 
 
 
