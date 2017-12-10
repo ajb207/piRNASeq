@@ -45,7 +45,10 @@ voom_top <- read.table(file = "../../data_files/stem_diff_targeting/top_targetin
 
 
 
-conversion <- read.table("../../conversion_sets/ensembl_conversion.txt", header = T, stringsAsFactors = F, sep = "\t")
+conversion <- read.table(file = "../../conversion_sets/ensembl_conversion.txt",
+                         header = T,
+                         stringsAsFactors = F, 
+                         sep = "\t")
 
 #load in the gene expression from RNA seq experiment
 gene_expression <- read.csv(file = "../../data_files/RNAseq_expressed_genes/GSC_vs_nonGSC_all_differentially_expressed_genes.csv", 
@@ -219,7 +222,10 @@ for(alignments_number in 1:length(UTR_alignments)){
 
 
 # file to convert ensembl gene ID to gene name
-conversion <- read.table("../../conversion_sets/ensembl_conversion.txt", header = T, stringsAsFactors = F, sep = "\t")
+conversion <- read.table(file =  "../../conversion_sets/ensembl_conversion.txt",
+                         header = T,
+                         stringsAsFactors = F, 
+                         sep = "\t")
 #top_genes <- read.csv("../../RNAseq/data/StemVsDiff_top_DE_genes.txt", stringsAsFactors=FALSE)[,c(1,2,8)]
 alignments_names <- c("gene_bt2v1score2", "gene_bt2v1score4" , "gene_bt2v1score6", "gene_bt2v1score8", "gene_bt2v1score10")
 gene_expression <- read.csv("../../data_files/RNAseq_expressed_genes/GSC_vs_nonGSC_all_differentially_expressed_genes.csv", sep = ",", stringsAsFactors = F)

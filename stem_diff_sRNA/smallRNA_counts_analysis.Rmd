@@ -7,24 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 
-require(limma)
-require(knitr)
-require(edgeR)
-require(biomaRt)
-require(DESeq2)
-require(edgeR)
-require(ggplot2)
-require(reshape)
-require(reshape2)
-require(stringdist)
-require(apcluster)
-require(qqman)
-require(Biostrings)
-require(motifRG)
-require(stringr)
-require(scales)
-require(ggrepel)
-require(RColorBrewer)
+
 
 conversion <- read.csv("../../reference_sets/ensembl_to_hgnc.txt", stringsAsFactors=FALSE)
 options(scipen=999)
