@@ -83,39 +83,6 @@ removeRepeats <- function(read_counts){
 }
 
 
-#create a fasta file from a list of sequences
-createpiRNAFasta <- 
-  function(fileName, extension){
-    
-    #read in the old file
-    fileText <- readLines(con  =fileName)
-    
-    newText <-vector(length = length(fileText)*2)
-    
-    #change name
-    n <- 1
-    for(line in seq(1,length(newText),2)){
-      #the fasta sequence to be inverted
-      sequence <- fileText[n]
-      #go to each letter and switch it
-      newText[line] <- paste(">",sequence, sep = "") 
-      n <- n + 1
-    }
-    
-    n <- 1
-    for(line in seq(2,length(newText),2)){
-      sequence <- fileText[n]
-      #go to each letter and switch it
-      newText[line] <- sequence
-      n <- n + 1
-    }
-    
-    return(newText)
-    #write.table(derp, "test.fa", sep = "\t", row.names = FALSE, col.names = FALSE, quote = FALSE)
-  }
-
-
-
 removeRepeats <- function(read_counts){
   
   tRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_tRNA.txt", header = FALSE, stringsAsFactors = FALSE)
@@ -160,6 +127,41 @@ removeRepeats <- function(read_counts){
 }
 
 
+
+
+#create a fasta file from a list of sequences
+createpiRNAFasta <- 
+  function(fileName, extension){
+    
+    #read in the old file
+    fileText <- readLines(con  =fileName)
+    
+    newText <-vector(length = length(fileText)*2)
+    
+    #change name
+    n <- 1
+    for(line in seq(1,length(newText),2)){
+      #the fasta sequence to be inverted
+      sequence <- fileText[n]
+      #go to each letter and switch it
+      newText[line] <- paste(">",sequence, sep = "") 
+      n <- n + 1
+    }
+    
+    n <- 1
+    for(line in seq(2,length(newText),2)){
+      sequence <- fileText[n]
+      #go to each letter and switch it
+      newText[line] <- sequence
+      n <- n + 1
+    }
+    
+    return(newText)
+    #write.table(derp, "test.fa", sep = "\t", row.names = FALSE, col.names = FALSE, quote = FALSE)
+  }
+
+
+
 removeSRP040525Repeats <- function(read_counts){
   
   
@@ -192,3 +194,81 @@ removeSRP040525Repeats <- function(read_counts){
   
   return(read_counts)
 }
+
+
+
+
+coexpressionPlot <- 
+  function(coexpression){
+    
+    # create and save the coexpression plot
+    print(
+      
+      #create the correlation plot 
+      ggplot(data = coexpression, aes(y = gene_logFC, 
+                                      x = piRNA_logFC)) +
+        # geom_rect(aes(xmin = 2, xmax =ceiling(max(coexpression$piRNA_logFC)), ymax = -2, ymin = floor(min(coexpression$gene_logFC))), fill = "white", color = "blue", alpha = 1/20000, size = .7) + 
+        # geom_rect(aes(xmax = -2, xmin = floor(min(coexpression$piRNA_logFC)), ymin = 2, ymax = ceiling(max(coexpression$gene_logFC))),fill = "white", color = "blue", alpha = 1/20000, size = .7) + 
+        geom_point(aes(color = gene_pval, 
+                       y = gene_logFC,
+                       x = piRNA_logFC, 
+                       alpha = 1-piRNA_pval), 
+                   size = .9) +
+        scale_color_gradientn(name ="Gene Pval" , 
+                              colors = c("darkblue","lightblue","red"),
+                              breaks = c( .01,.1,1), 
+                              limits = c(0,1), 
+                              values = c(.0000001, .1, 1)) +
+        scale_alpha_continuous(labels = c(1,.1,.05,.001), 
+                               limits = c(.001,  1),
+                               breaks = c( .001,.05,.1,1),
+                               name = "piRNA Pval") + 
+        geom_hline(aes(yintercept = 2), 
+                   linetype ="dotted") +
+        geom_hline(aes(yintercept = -2), 
+                   linetype = "dotted") +
+        geom_vline(aes(xintercept = 2), 
+                   linetype ="dotted") +
+        geom_vline(aes(xintercept = -2), 
+                   linetype ="dotted") +
+        scale_y_continuous(breaks = c(seq((floor(min(coexpression$gene_logFC))), ceiling(max(coexpression$gene_logFC)), 1))) +
+        scale_x_continuous(breaks = c(seq((floor(min(coexpression$piRNA_logFC))), ceiling(max(coexpression$piRNA_logFC)), 1))) +
+        #scale_linetype_manual(guide = FALSE) +
+        
+        guides(linetype = FALSE) +   
+        #ggtitle("3UTR Targeting: Gene LFC ~ piRNA LFC ") +
+        #scale_color_manual(values = c("black", "blue")) + 
+        xlab("piRNA logFC") +
+        ylab("Target logFC") +
+        #scale_size(range =c(.5,1.5)) + 
+        # labs(  color = "Gene Pval") +
+        theme_bw() 
+      #theme(panel.grid.major.x = element_blank()) 
+      #theme(legend.position ="right")
+      
+    )
+  }
+
+
+
+buildCoexpression <- 
+  function(alignments, #converted before hand,
+           piRNA_expression,
+           gene_expression){
+    
+    coexpression <- 
+      unique(
+        merge(x = piRNA_expression,
+              y = alignments,
+              by = "piRNA"))
+    
+    coexpression <-merge(x = coexpression,
+                         y = subset(gene_expression, 
+                                    select = c(hgnc_symbol, logFC, adj.P.Val)),
+                         by = "hgnc_symbol")
+    colnames(coexpression)[5:6] <- c( "gene_logFC", "gene_pval")
+    
+    
+    return(coexpression)
+    
+  }

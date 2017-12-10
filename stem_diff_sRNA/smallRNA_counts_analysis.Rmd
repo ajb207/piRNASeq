@@ -161,7 +161,9 @@ read_counts <- read_counts[!rowSums(read_counts) == 0,]
 
 
 
-unique <- read.table("../alignments/small_sa_og_norRNA_alignments_uniquemapping_list.txt", header = FALSE, stringsAsFactors = FALSE)
+unique <- read.table(file = "../../data_files/stem_diff_alignments//small_sa_og_norRNA_alignments_uniquemapping_list.txt", 
+                     header = FALSE,
+                     stringsAsFactors = FALSE)
 uniquepiRNA <-  read_counts[rownames(read_counts) %in% unique$V1,]
 RDpiRNA <- read_counts[!rownames(read_counts) %in% unique$V1,]
 uniquepiRNA <- uniquepiRNA[!rowSums(uniquepiRNA) == 0,]

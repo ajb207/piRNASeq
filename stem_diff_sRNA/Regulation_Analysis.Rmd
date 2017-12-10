@@ -27,7 +27,7 @@ Below are the code chunks for analyzing the alignments gathered between each piR
 
 
 
-#loads the targeting sequences expressionts
+# load the targeting sequences expressions
 voom_sRNA <- read.table(file = "../../data_files/stem_diff_targeting/targeting_sRNA.csv",
                         stringsAsFactors = F, 
                         header  = T, 
@@ -43,12 +43,6 @@ voom_top <- read.table(file = "../../data_files/stem_diff_targeting/top_targetin
                        header  = T, 
                        sep = ",")
 
-
-
-conversion <- read.table(file = "../../conversion_sets/ensembl_conversion.txt",
-                         header = T,
-                         stringsAsFactors = F, 
-                         sep = "\t")
 
 #load in the gene expression from RNA seq experiment
 gene_expression <- read.csv(file = "../../data_files/RNAseq_expressed_genes/GSC_vs_nonGSC_all_differentially_expressed_genes.csv", 
@@ -89,6 +83,42 @@ promoter_alignments[[2]] <-  read.delim("../../data_files/stem_diff_alignments/t
 promoter_alignments[[3]] <-  read.delim("../../data_files/stem_diff_alignments/temp_alignments/promoter_temp_alignments_bt2v1score6.txt", header=FALSE, stringsAsFactors=FALSE)[,]
 promoter_alignments_names <- c("bt2v1score2", "bt2v1score4" , "bt2v1score6")
 
+
+```
+
+
+
+```{r build plot function}
+
+
+alignments <- UTR_alignments[[1]]
+colnames(alignments) <- c("piRNA", "transcript_id", "bp_start", "alignment_info", "mismatches")
+# remove the transcipt name
+alignments$transcript_id <- sapply(alignments$transcript_id,
+                                   FUN = function(x){unlist(strsplit(x, split = "\\|"))[2]})
+
+conversion <- read.table(file =  "../../conversion_sets/ensembl_conversion.txt",
+                         header = T, 
+                         stringsAsFactors = F,
+                         sep = "\t")
+
+alignments <- merge(alignments, 
+                    conversion, 
+                    by = "transcript_id")
+alignments <- subset(alignments, select = c(piRNA, hgnc_symbol))
+alignments <- unique(alignments)
+#alignments <- alignmentInfo(alignments)
+
+piRNA_expression <- subset(x = voom_sRNA, 
+                          select = c(sRNA, logFC, adj.P.Val))
+colnames(piRNA_expression) <- c("piRNA", "piRNA_logFC", "piRNA_pval")       
+
+
+coexpression <- buildCoexpression(alignments = alignments, 
+                                  piRNA_expression = piRNA_expression, 
+                                  gene_expression = gene_expression)
+
+coexpressionPlot(coexpression)
 
 ```
 
@@ -144,9 +174,9 @@ for(alignments_number in 1:length(UTR_alignments)){
             by.x = "sRNA", by.y = "piRNA"))
   
   colnames(coexpression)[1:3] <- c("piRNA", "piRNA_logFC", "piRNA_pval")
-  coexpression <-merge(coexpression,
-                       subset(gene_expression, 
-                              select = c(hgnc_symbol, logFC, adj.P.Val)),
+  coexpression <-merge(x = coexpression,
+                       y = subset(gene_expression, 
+                                  select = c(hgnc_symbol, logFC, adj.P.Val)),
                        by = "hgnc_symbol")
   colnames(coexpression)[5:6] <- c( "gene_logFC", "gene_pval")
   
@@ -228,8 +258,10 @@ conversion <- read.table(file =  "../../conversion_sets/ensembl_conversion.txt",
                          sep = "\t")
 #top_genes <- read.csv("../../RNAseq/data/StemVsDiff_top_DE_genes.txt", stringsAsFactors=FALSE)[,c(1,2,8)]
 alignments_names <- c("gene_bt2v1score2", "gene_bt2v1score4" , "gene_bt2v1score6", "gene_bt2v1score8", "gene_bt2v1score10")
-gene_expression <- read.csv("../../data_files/RNAseq_expressed_genes/GSC_vs_nonGSC_all_differentially_expressed_genes.csv", sep = ",", stringsAsFactors = F)
+gene_expression <- read.csv(file = "../../data_files/RNAseq_expressed_genes/GSC_vs_nonGSC_all_differentially_expressed_genes.csv",
+                            stringsAsFactors = F)
 
+# convert the names of the genes
 gene_expression <- 
   unique(
     merge(conversion[,c(1,3)],
@@ -249,8 +281,8 @@ for(alignments_number in 1:length(cDNA_alignments)){
                                    replacement = "", 
                                    alignments$transcript_id)
   # convert the ID to the gene name
-  alignments <- merge(alignments, 
-                      conversion, 
+  alignments <- merge(x = alignments, 
+                      y = conversion, 
                       by = "transcript_id" )
   # select only unique gene alignments
   alignments <- unique(alignments)
@@ -280,8 +312,8 @@ for(alignments_number in 1:length(cDNA_alignments)){
         by.y = "piRNA"))
   
   colnames(coexpression)[1:3] <- c("piRNA", "piRNA_logFC", "piRNA_pval")
-  coexpression <-merge(coexpression,
-                       subset(gene_expression, 
+  coexpression <-merge(x = coexpression,
+                       y = subset(gene_expression, 
                               select = c(hgnc_symbol, logFC, adj.P.Val)),
                        by = "hgnc_symbol")
   colnames(coexpression)[5:6] <- c( "gene_logFC", "gene_pval")
