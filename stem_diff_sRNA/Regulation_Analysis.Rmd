@@ -203,13 +203,13 @@ for(n in 1:length(alignments)){
 
 
 
-
-coexpression <- buildCoexpression(alignments = alignments[[1]] , 
+for (alignments in alignments){
+coexpression <- buildCoexpression(alignments = alignments , 
                                   piRNA.expression = piRNA.expression, 
                                   gene.expression = gene.expression)
 
 coexpressionPlot(coexpression)
-
+}
 
 #loading in the bowtie alignments from piRNA against cDNA
 #alignments <- read.delim("../alignments/targeting_alignments/cDNA/sa_og_norRNA_25_33_noncRNA_21bp_list_alignments_3UTR_v3.txt", header=FALSE, stringsAsFactors=FALSE)[,]
