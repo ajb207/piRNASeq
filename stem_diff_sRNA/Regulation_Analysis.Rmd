@@ -53,18 +53,20 @@ top_genes <- read.csv(file = "../../data_files/RNAseq_expressed_genes/GSC_vs_non
                       stringsAsFactors = F)
 
 
-cDNA_alignments <- list()
-cDNA_alignments[[1]] <-  read.delim("../../data_files/stem_diff_alignments/temp_alignments/cDNA_temp_alignments_bt2v1score2.txt", header=FALSE, stringsAsFactors=FALSE)[,]
-cDNA_alignments[[2]] <-  read.delim("../../data_files/stem_diff_alignments/temp_alignments/cDNA_temp_alignments_bt2v1score4.txt", header=FALSE, stringsAsFactors=FALSE)[,]
-cDNA_alignments[[3]] <-  read.delim("../../data_files/stem_diff_alignments/temp_alignments/cDNA_temp_alignments_bt2v1score6.txt", header=FALSE, stringsAsFactors=FALSE)[,]
-
-
 
 UTR_alignments <- list()
 UTR_alignments[[1]] <-  read.delim("../../data_files/stem_diff_alignments/temp_alignments/3UTR_temp_alignments_bt2v1score2.txt", header=FALSE, stringsAsFactors=FALSE)[,]
 UTR_alignments[[2]] <-  read.delim("../../data_files/stem_diff_alignments/temp_alignments/3UTR_temp_alignments_bt2v1score4.txt", header=FALSE, stringsAsFactors=FALSE)[,]
 UTR_alignments[[3]] <-  read.delim("../../data_files/stem_diff_alignments/temp_alignments/3UTR_temp_alignments_bt2v1score6.txt", header=FALSE, stringsAsFactors=FALSE)[,]
 UTR_alignments_names <- c("bt2v1score2", "bt2v1score4" , "bt2v1score6")
+
+
+
+
+cDNA_alignments <- list()
+cDNA_alignments[[1]] <-  read.delim("../../data_files/stem_diff_alignments/temp_alignments/cDNA_temp_alignments_bt2v1score2.txt", header=FALSE, stringsAsFactors=FALSE)[,]
+cDNA_alignments[[2]] <-  read.delim("../../data_files/stem_diff_alignments/temp_alignments/cDNA_temp_alignments_bt2v1score4.txt", header=FALSE, stringsAsFactors=FALSE)[,]
+cDNA_alignments[[3]] <-  read.delim("../../data_files/stem_diff_alignments/temp_alignments/cDNA_temp_alignments_bt2v1score6.txt", header=FALSE, stringsAsFactors=FALSE)[,]
 
 
 # WHERE ARE THESE?!?!?!!??!?!?!
@@ -128,6 +130,85 @@ coexpressionPlot(coexpression)
 
 
 ```{r 3UTR_alignments, echo = FALSE}
+
+
+
+# load the targeting sequences expressions
+piRNA.expression <- read.table(file = "../../data_files/stem_diff_targeting/targeting_sRNA.csv",
+                        stringsAsFactors = F, 
+                        header  = T, 
+                        sep = ",")
+piRNA.expression <- subset(x = voom_sRNA, 
+                          select = c(sRNA, logFC, adj.P.Val))
+colnames(piRNA.expression) <- c("piRNA", "piRNA_logFC", "piRNA_pval")  
+
+
+# 
+# 
+# rmsk <- read.table(file = "../../data_files/stem_diff_alignments/small_sa_og_norRNA_25_33_25bp_alignments_repeatmasker.txt",
+#                    stringsAsFactors = F,
+#                    header  = F,
+#                    sep = "\t")
+# rmsk <- rmsk[!grepl(rmsk$V3, pattern = "tRNA"),]
+# voom_sRNA <- voom_sRNA[!(voom_sRNA$sRNA %in% rmsk$V1),]
+
+top.piRNA <- read.table(file = "../../data_files/stem_diff_targeting/top_targeting_sRNA.csv", 
+                       stringsAsFactors = F,
+                       header  = T, 
+                       sep = ",")
+
+#load in the gene expression from RNA seq experiment
+gene.expression <- read.csv(file = "../../data_files/RNAseq_expressed_genes/GSC_vs_nonGSC_all_differentially_expressed_genes.csv", 
+                            sep = ",", 
+                            stringsAsFactors = F)
+
+gene.expression <- subset(gene_expression, 
+                          select = c(hgnc_symbol, logFC, adj.P.Val))
+colnames(gene.expression) <- c("gene", "gene_logFC", "gene_pval")  
+
+top_genes <- read.csv(file = "../../data_files/RNAseq_expressed_genes/GSC_vs_nonGSC_top_pval05_differentially_expressed_genes.csv", 
+                      sep = ",",
+                      stringsAsFactors = F)
+
+
+alignments <- list()
+alignments[[1]] <-  read.delim("../../data_files/stem_diff_alignments/temp_alignments/3UTR_temp_alignments_bt2v1score2.txt", header=FALSE, stringsAsFactors=FALSE)[,]
+alignments[[2]] <-  read.delim("../../data_files/stem_diff_alignments/temp_alignments/3UTR_temp_alignments_bt2v1score4.txt", header=FALSE, stringsAsFactors=FALSE)[,]
+alignments[[3]] <-  read.delim("../../data_files/stem_diff_alignments/temp_alignments/3UTR_temp_alignments_bt2v1score6.txt", header=FALSE, stringsAsFactors=FALSE)[,]
+alignments_names <- c("bt2v1score2", "bt2v1score4" , "bt2v1score6")
+
+conversion <- read.table(file =  "../../conversion_sets/ensembl_conversion.txt",
+                         header = T, 
+                         stringsAsFactors = F,
+                         sep = "\t")
+
+for(n in 1:length(alignments)){
+  temp <- alignments[[n]]
+  colnames(temp) <- c("piRNA", "transcript_id", "bp_start", "alignment_info", "mismatches")
+  # remove the transcipt name
+  temp$transcript_id <- sapply(temp$transcript_id,
+                                     FUN = function(x){unlist(strsplit(x, split = "\\|"))[2]})
+  
+  temp <- merge(temp, 
+                conversion, 
+                by = "transcript_id")
+  temp <- subset(temp, 
+                 select = c(piRNA, hgnc_symbol))
+  temp <- unique(temp)
+  colnames(temp) <- c("piRNA", "gene")
+  alignments[[n]] <- temp
+}
+
+
+
+
+
+
+coexpression <- buildCoexpression(alignments = alignments[[1]] , 
+                                  piRNA.expression = piRNA.expression, 
+                                  gene.expression = gene.expression)
+
+coexpressionPlot(coexpression)
 
 
 #loading in the bowtie alignments from piRNA against cDNA

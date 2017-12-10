@@ -253,20 +253,19 @@ plotCoexpression <-
 
 buildCoexpression <- 
   function(alignments, #converted before hand,
-           piRNA_expression,
-           gene_expression){
+           piRNA.expression,
+           gene.expression){
     
     coexpression <- 
       unique(
-        merge(x = piRNA_expression,
+        merge(x = piRNA.expression,
               y = alignments,
               by = "piRNA"))
     
     coexpression <-merge(x = coexpression,
-                         y = subset(gene_expression, 
-                                    select = c(hgnc_symbol, logFC, adj.P.Val)),
-                         by = "hgnc_symbol")
-    colnames(coexpression)[5:6] <- c( "gene_logFC", "gene_pval")
+                         y = gene.expression,
+                         by = "gene")
+    #colnames(coexpression)[5:6] <- c( "gene_logFC", "gene_pval")
     
     
     return(coexpression)
