@@ -198,7 +198,7 @@ removeSRP040525Repeats <- function(read_counts){
 
 
 
-coexpressionPlot <- 
+plotCoexpression <- 
   function(coexpression){
     
     # create and save the coexpression plot
