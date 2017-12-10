@@ -134,12 +134,12 @@ coexpressionPlot(coexpression)
 
 
 # load the targeting sequences expressions
-piRNA.expression <- read.table(file = "../../data_files/stem_diff_targeting/targeting_sRNA.csv",
-                        stringsAsFactors = F, 
-                        header  = T, 
-                        sep = ",")
-piRNA.expression <- subset(x = voom_sRNA, 
-                          select = c(sRNA, logFC, adj.P.Val))
+piRNA.expression <- 
+  read.table(file = "../../data_files/stem_diff_targeting/targeting_sRNA.csv",
+             stringsAsFactors = F, 
+             header  = T, 
+             sep = ",") %>%
+  subset(select = c(sRNA, logFC, adj.P.Val)) 
 colnames(piRNA.expression) <- c("piRNA", "piRNA_logFC", "piRNA_pval")  
 
 
@@ -153,17 +153,16 @@ colnames(piRNA.expression) <- c("piRNA", "piRNA_logFC", "piRNA_pval")
 # voom_sRNA <- voom_sRNA[!(voom_sRNA$sRNA %in% rmsk$V1),]
 
 top.piRNA <- read.table(file = "../../data_files/stem_diff_targeting/top_targeting_sRNA.csv", 
-                       stringsAsFactors = F,
-                       header  = T, 
-                       sep = ",")
+                        stringsAsFactors = F,
+                        header  = T, 
+                        sep = ",")
 
 #load in the gene expression from RNA seq experiment
-gene.expression <- read.csv(file = "../../data_files/RNAseq_expressed_genes/GSC_vs_nonGSC_all_differentially_expressed_genes.csv", 
-                            sep = ",", 
-                            stringsAsFactors = F)
-
-gene.expression <- subset(gene_expression, 
-                          select = c(hgnc_symbol, logFC, adj.P.Val))
+gene.expression <- 
+  read.csv(file = "../../data_files/RNAseq_expressed_genes/GSC_vs_nonGSC_all_differentially_expressed_genes.csv", 
+           sep = ",", 
+           stringsAsFactors = F) %>%
+  subset(select = c(hgnc_symbol, logFC, adj.P.Val))
 colnames(gene.expression) <- c("gene", "gene_logFC", "gene_pval")  
 
 top_genes <- read.csv(file = "../../data_files/RNAseq_expressed_genes/GSC_vs_nonGSC_top_pval05_differentially_expressed_genes.csv", 
@@ -204,21 +203,13 @@ for(n in 1:length(alignments)){
 
 
 for (alignments in alignments){
-coexpression <- buildCoexpression(alignments = alignments , 
-                                  piRNA.expression = piRNA.expression, 
-                                  gene.expression = gene.expression)
-
-coexpressionPlot(coexpression)
+  coexpression <- buildCoexpression(alignments = alignments , 
+                                    piRNA.expression = piRNA.expression, 
+                                    gene.expression = gene.expression)
+  
+  coexpressionPlot(coexpression)
 }
 
-#loading in the bowtie alignments from piRNA against cDNA
-#alignments <- read.delim("../alignments/targeting_alignments/cDNA/sa_og_norRNA_25_33_noncRNA_21bp_list_alignments_3UTR_v3.txt", header=FALSE, stringsAsFactors=FALSE)[,]
-
-#system("grep -f temp_read_names.txt ../alignments/list_targeting/small_sa_og_norRNA_25_33_25bp_targeting_3UTR_51_l9_n0_e140.txt > 3UTR_temp_alignments.txt" )
-
-#alignments <- read.delim("3UTR_temp_alignments.txt", header=FALSE, stringsAsFactors=FALSE)[,]
-#label the columns approriately
-#colnames(alignments) <- c("piRNA", "gene", "bp_start", "mismatches")
 
 
 for(alignments_number in 1:length(UTR_alignments)){
