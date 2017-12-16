@@ -95,16 +95,24 @@ fit <-
 
 
 #voom fold changesmiRNA_alignments
-voom_sRNA <- topTable(fit, coef = "celltypeS", sort.by="logFC", number =nrow(voom.counts) )
-voom_top <- topTable(fit,coef = "celltypeS", sort.by="logFC", number =nrow(voom.counts),lfc = 0,p.value = 0.05)
+voom.sRNA <- topTable(fit = fit, 
+                      coef = "celltypeS", 
+                      sort.by ="logFC", 
+                      number = nrow(voom.counts) )
+voom.top <- topTable(fit = fit,
+                     coef = "celltypeS", 
+                     sort.by ="logFC", 
+                     number = nrow(voom.counts),
+                     lfc = 0,
+                     p.value = 0.05)
 #voomNormExp <- voomCounts$E
 #rm(celltype);rm(design.array); rm(design); rm(dge.counts)
 #my name function
 
 #adding the reads names into its own column for merging
-voom_sRNA$sRNA <- rownames(voom_sRNA)
-voom_top_sRNA <- voom_top
-voom_top_sRNA$sRNA <- rownames(voom_top_sRNA)
+voom.sRNA$sRNA <- rownames(voom.sRNA)
+voom.top_sRNA <- voom.top
+voom.top_sRNA$sRNA <- rownames(voom.top_sRNA)
 
 #voom_top_sRNA$sRNA <- strtrim(voom_top_sRNA$sRNA, 25)
 #write.table("../fastx_files/DE_piRNA_list.txt",x =  voom_top_sRNA$sRNA, quote = F,row.names = F, col.names = F)
@@ -117,15 +125,34 @@ voom_top_sRNA$sRNA <- rownames(voom_top_sRNA)
 ```{r piRNA_information_addition}
 
 #tRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_tRNA.txt", header = FALSE, stringsAsFactors = FALSE)
-lncRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_lncRNA.txt", header = FALSE, stringsAsFactors = FALSE)
-unique <- read.table("../alignments/small_sa_og_norRNA_alignments_uniquemapping_list.txt", header = FALSE, stringsAsFactors = FALSE)
-piRBase <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_piRNA.txt", header = FALSE, stringsAsFactors = FALSE)
-piRBaseplus15 <- read.table("../alignments/biogenesis_alignments_norRNA_25_33/small_sa_og_norRNA_25_33_list_alignments_piRNAbaseplus15_list.txt", header = FALSE, stringsAsFactors = FALSE)
-YRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_YRNA.txt", header = FALSE, stringsAsFactors = FALSE)
-snoRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_snoRNA.txt", header = FALSE, stringsAsFactors = FALSE)
-miRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_miRNA.txt", header = FALSE, stringsAsFactors = FALSE, sep = "\t")
-mRNA <- read.table("../alignments/biogenesis_alignments_norRNA_25_33/small_sa_og_norRNA_25_33_list_alignments_cDNA_list.txt", header = FALSE, stringsAsFactors = FALSE)
-rmsk <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_repeatmasker.txt", header = FALSE, stringsAsFactors = FALSE, sep = "\t")
+lncRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_lncRNA.txt",
+                     header = FALSE, 
+                     stringsAsFactors = FALSE)
+unique <- read.table("../alignments/small_sa_og_norRNA_alignments_uniquemapping_list.txt", 
+                     header = FALSE, 
+                     stringsAsFactors = FALSE)
+piRBase <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_piRNA.txt", 
+                      header = FALSE, 
+                      stringsAsFactors = FALSE)
+piRBaseplus15 <- read.table("../alignments/biogenesis_alignments_norRNA_25_33/small_sa_og_norRNA_25_33_list_alignments_piRNAbaseplus15_list.txt",
+                            header = FALSE,
+                            stringsAsFactors = FALSE)
+YRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_YRNA.txt", 
+                   header = FALSE, 
+                   stringsAsFactors = FALSE)
+snoRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_snoRNA.txt",
+                     header = FALSE, 
+                     stringsAsFactors = FALSE)
+miRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_miRNA.txt",
+                    header = FALSE, 
+                    stringsAsFactors = FALSE, sep = "\t")
+mRNA <- read.table("../alignments/biogenesis_alignments_norRNA_25_33/small_sa_og_norRNA_25_33_list_alignments_cDNA_list.txt",
+                   header = FALSE, 
+                   stringsAsFactors = FALSE)
+rmsk <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_repeatmasker.txt", 
+                   header = FALSE, 
+                   stringsAsFactors = FALSE,
+                   sep = "\t")
 colnames(rmsk) <- c("sRNA", "Repeat Name")
 rmsk$`Repeat Name` <- gsub(pattern = "_", replacement = "", rmsk$`Repeat Name`)
 rmsk_plus40 <- read.table("../alignments/small_sa_og_norRNA_alignments_repeatmasker_plus40.txt", header = FALSE, stringsAsFactors = FALSE)
