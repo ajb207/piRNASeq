@@ -69,12 +69,6 @@ UTR_alignments_names <- c("bt2v1score2", "bt2v1score4" , "bt2v1score6")
 
 
 
-cDNA_alignments <- list()
-cDNA_alignments[[1]] <-  read.delim("../../data_files/stem_diff_alignments/temp_alignments/cDNA_temp_alignments_bt2v1score2.txt", header=FALSE, stringsAsFactors=FALSE)[,]
-cDNA_alignments[[2]] <-  read.delim("../../data_files/stem_diff_alignments/temp_alignments/cDNA_temp_alignments_bt2v1score4.txt", header=FALSE, stringsAsFactors=FALSE)[,]
-cDNA_alignments[[3]] <-  read.delim("../../data_files/stem_diff_alignments/temp_alignments/cDNA_temp_alignments_bt2v1score6.txt", header=FALSE, stringsAsFactors=FALSE)[,]
-
-
 # WHERE ARE THESE?!?!?!!??!?!?!
 # 
 # gsgarahd
@@ -94,41 +88,6 @@ promoter_alignments_names <- c("bt2v1score2", "bt2v1score4" , "bt2v1score6")
 
 ```
 
-
-
-```{r build plot function}
-
-
-alignments <- UTR_alignments[[1]]
-colnames(alignments) <- c("piRNA", "transcript_id", "bp_start", "alignment_info", "mismatches")
-# remove the transcipt name
-alignments$transcript_id <- sapply(alignments$transcript_id,
-                                   FUN = function(x){unlist(strsplit(x, split = "\\|"))[2]})
-
-conversion <- read.table(file =  "../../conversion_sets/ensembl_conversion.txt",
-                         header = T, 
-                         stringsAsFactors = F,
-                         sep = "\t")
-
-alignments <- merge(alignments, 
-                    conversion, 
-                    by = "transcript_id")
-alignments <- subset(alignments, select = c(piRNA, hgnc_symbol))
-alignments <- unique(alignments)
-#alignments <- alignmentInfo(alignments)
-
-piRNA_expression <- subset(x = voom_sRNA, 
-                          select = c(sRNA, logFC, adj.P.Val))
-colnames(piRNA_expression) <- c("piRNA", "piRNA_logFC", "piRNA_pval")       
-
-
-coexpression <- buildCoexpression(alignments = alignments, 
-                                  piRNA_expression = piRNA_expression, 
-                                  gene_expression = gene_expression)
-
-coexpressionPlot(coexpression)
-
-```
 
 
 
@@ -334,6 +293,59 @@ for(alignments_number in 1:length(UTR_alignments)){
 
 ```{r cDNA_alignments, echo = FALSE}
 
+
+
+alignments <- list()
+alignments[[1]] <-  read.delim(file = "../../data_files/stem_diff_alignments/temp_alignments/cDNA_temp_alignments_bt2v1score2.txt",
+                               header=FALSE, 
+                               stringsAsFactors=FALSE)[,]
+alignments[[2]] <-  read.delim(file = "../../data_files/stem_diff_alignments/temp_alignments/cDNA_temp_alignments_bt2v1score4.txt",
+                               header=FALSE, 
+                               stringsAsFactors=FALSE)[,]
+alignments[[3]] <-  read.delim(file = "../../data_files/stem_diff_alignments/temp_alignments/cDNA_temp_alignments_bt2v1score6.txt",
+                               header=FALSE,
+                               stringsAsFactors=FALSE)[,]
+
+
+## TODO
+
+conversion <- read.table(file =  "../../conversion_sets/ensembl_conversion.txt",
+                         header = T, 
+                         stringsAsFactors = F,
+                         sep = "\t")
+
+# convert the names to hgnc symbols
+for(n in 1:length(alignments)){
+  temp <- alignments[[n]]
+  colnames(temp) <- c("piRNA", "transcript_id", "bp_start", "alignment_info", "mismatches")
+  # remove the transcipt name
+  temp$transcript_id <- sapply(temp$transcript_id,
+                                     FUN = function(x){unlist(strsplit(x, split = "\\|"))[2]})
+  
+  temp <-
+    temp %>%
+    merge(conversion, 
+          by = "transcript_id") %>%
+    subset(select = c(piRNA, hgnc_symbol)) %>%
+    unique()
+  colnames(temp) <- c("piRNA", "gene")
+  alignments[[n]] <- temp
+}
+
+
+
+
+# build each coexpression, then plot it
+for (alignments in alignments){
+  coexpression <- buildCoexpression(alignments = alignments , 
+                                    piRNA.expression = piRNA.expression, 
+                                    gene.expression = gene.expression)
+  
+  coexpressionPlot(coexpression)
+}
+
+
+############################
 
 # file to convert ensembl gene ID to gene name
 conversion <- read.table(file =  "../../conversion_sets/ensembl_conversion.txt",
