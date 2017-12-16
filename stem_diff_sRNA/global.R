@@ -35,6 +35,23 @@ require(scales)
 require(ggrepel)
 require(RColorBrewer)
 
+require(limma)
+require(knitr)
+require(edgeR)
+require(biomaRt)
+require(DESeq2)
+require(edgeR)
+require(ggplot2)
+require(reshape)
+require(reshape2)
+require(Biostrings)
+require(plotly)
+require(qqman)
+require(scales)
+require(ggrepel)
+require(RColorBrewer)
+
+
 source('stem_diff_sRNA_functions.R')
 
 

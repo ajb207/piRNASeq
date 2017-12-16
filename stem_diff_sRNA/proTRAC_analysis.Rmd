@@ -25,7 +25,11 @@ clusterStart <-
   }
 clusterEnd <- 
   function(cluster_coordinates){
-    return(as.numeric(unlist(strsplit(cluster_coordinates, split = "-"))[2]))
+    cluster_coordinates %>%
+    strsplit(split = "-") %>%
+    unlist()[2] %>%
+    as.numeric() %>%
+    return()
   }
 
 #load the proTRAC files
@@ -51,8 +55,11 @@ loadClusters <-
       clusters %>% 
       strsplit(split = " ") %>%
       unlist()
-    clusters <- matrix(data = clusters, byrow = TRUE, ncol = 6)
-    clusters <- as.data.frame(clusters)
+    clusters <- 
+      clusters %>%
+      matrix(byrow = TRUE, 
+             ncol = 6) %>%
+      as.data.frame()
     clusters <- clusters[,c(1,2,6)]
     colnames(clusters) <- c("chromosome", "coordinates", "direction")
     clusters$coordinates <- as.character(clusters$coordinates)
@@ -322,19 +329,20 @@ print(
 
 #test <- all_clusters[(all_clusters$chromosome == 2 & (all_clusters$start > 68556068) & (all_clusters$start < 68836068)),  ]
 
-cluster_plot <- function(chromosome){
-  #create the data frame for ggplot to use
-  data <- all_clusters[all_clusters$chromosome == chromosome,]
-  
-  ggplot(data, aes(x=start, xend=end, y=cell_line, yend=cell_line, color= cell_type)) +
-    geom_segment(size=3) +
-    geom_point(size=3) +
-    geom_point(aes(x=end), size=2, shape = 18) +
-    ggtitle(paste("Chromosome", chromosome, collapse = " ")) + 
-    ylab("Cell Line") + 
-    xlab("Cluster Location") +
-    scale_x_continuous(labels = comma)
-}
+cluster_plot <- 
+  function(chromosome){
+    #create the data frame for ggplot to use
+    data <- all_clusters[all_clusters$chromosome == chromosome,]
+    
+    ggplot(data, aes(x=start, xend=end, y=cell_line, yend=cell_line, color= cell_type)) +
+      geom_segment(size=3) +
+      geom_point(size=3) +
+      geom_point(aes(x=end), size=2, shape = 18) +
+      ggtitle(paste("Chromosome", chromosome, collapse = " ")) + 
+      ylab("Cell Line") + 
+      xlab("Cluster Location") +
+      scale_x_continuous(labels = comma)
+  }
 
 plots <- lapply(X = sort(unique(all_clusters$chromosome), decreasing = FALSE), FUN = cluster_plot)
 print(plots)
