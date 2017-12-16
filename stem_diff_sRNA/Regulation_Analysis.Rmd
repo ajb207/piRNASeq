@@ -55,9 +55,15 @@ top_genes <- read.csv(file = "../../data_files/RNAseq_expressed_genes/GSC_vs_non
 
 
 UTR_alignments <- list()
-UTR_alignments[[1]] <-  read.delim("../../data_files/stem_diff_alignments/temp_alignments/3UTR_temp_alignments_bt2v1score2.txt", header=FALSE, stringsAsFactors=FALSE)[,]
-UTR_alignments[[2]] <-  read.delim("../../data_files/stem_diff_alignments/temp_alignments/3UTR_temp_alignments_bt2v1score4.txt", header=FALSE, stringsAsFactors=FALSE)[,]
-UTR_alignments[[3]] <-  read.delim("../../data_files/stem_diff_alignments/temp_alignments/3UTR_temp_alignments_bt2v1score6.txt", header=FALSE, stringsAsFactors=FALSE)[,]
+UTR_alignments[[1]] <-  read.delim(file = "../../data_files/stem_diff_alignments/temp_alignments/3UTR_temp_alignments_bt2v1score2.txt",
+                                   header=FALSE, 
+                                   stringsAsFactors=FALSE)[,]
+UTR_alignments[[2]] <-  read.delim("../../data_files/stem_diff_alignments/temp_alignments/3UTR_temp_alignments_bt2v1score4.txt", 
+                                   header=FALSE, 
+                                   stringsAsFactors=FALSE)[,]
+UTR_alignments[[3]] <-  read.delim("../../data_files/stem_diff_alignments/temp_alignments/3UTR_temp_alignments_bt2v1score6.txt", 
+                                   header=FALSE, 
+                                   stringsAsFactors=FALSE)[,]
 UTR_alignments_names <- c("bt2v1score2", "bt2v1score4" , "bt2v1score6")
 
 
@@ -172,9 +178,15 @@ top_genes <- read.csv(file = "../../data_files/RNAseq_expressed_genes/GSC_vs_non
 
 
 alignments <- list()
-alignments[[1]] <-  read.delim("../../data_files/stem_diff_alignments/temp_alignments/3UTR_temp_alignments_bt2v1score2.txt", header=FALSE, stringsAsFactors=FALSE)[,]
-alignments[[2]] <-  read.delim("../../data_files/stem_diff_alignments/temp_alignments/3UTR_temp_alignments_bt2v1score4.txt", header=FALSE, stringsAsFactors=FALSE)[,]
-alignments[[3]] <-  read.delim("../../data_files/stem_diff_alignments/temp_alignments/3UTR_temp_alignments_bt2v1score6.txt", header=FALSE, stringsAsFactors=FALSE)[,]
+alignments[[1]] <-  read.delim(file = "../../data_files/stem_diff_alignments/temp_alignments/3UTR_temp_alignments_bt2v1score2.txt",
+                               header=FALSE, 
+                               stringsAsFactors=FALSE)[,]
+alignments[[2]] <-  read.delim(file = "../../data_files/stem_diff_alignments/temp_alignments/3UTR_temp_alignments_bt2v1score4.txt",
+                               header=FALSE,
+                               stringsAsFactors=FALSE)[,]
+alignments[[3]] <-  read.delim(file = "../../data_files/stem_diff_alignments/temp_alignments/3UTR_temp_alignments_bt2v1score6.txt",
+                               header=FALSE,
+                               stringsAsFactors=FALSE)[,]
 alignments_names <- c("bt2v1score2", "bt2v1score4" , "bt2v1score6")
 
 conversion <- read.table(file =  "../../conversion_sets/ensembl_conversion.txt",
@@ -182,6 +194,7 @@ conversion <- read.table(file =  "../../conversion_sets/ensembl_conversion.txt",
                          stringsAsFactors = F,
                          sep = "\t")
 
+# convert the names to hgnc symbols
 for(n in 1:length(alignments)){
   temp <- alignments[[n]]
   colnames(temp) <- c("piRNA", "transcript_id", "bp_start", "alignment_info", "mismatches")
@@ -189,12 +202,12 @@ for(n in 1:length(alignments)){
   temp$transcript_id <- sapply(temp$transcript_id,
                                      FUN = function(x){unlist(strsplit(x, split = "\\|"))[2]})
   
-  temp <- merge(temp, 
-                conversion, 
-                by = "transcript_id")
-  temp <- subset(temp, 
-                 select = c(piRNA, hgnc_symbol))
-  temp <- unique(temp)
+  temp <-
+    temp %>%
+    merge(conversion, 
+          by = "transcript_id") %>%
+    subset(select = c(piRNA, hgnc_symbol)) %>%
+    unique()
   colnames(temp) <- c("piRNA", "gene")
   alignments[[n]] <- temp
 }
