@@ -293,7 +293,26 @@ for(alignments_number in 1:length(UTR_alignments)){
 
 ```{r cDNA_alignments, echo = FALSE}
 
+## TODO
 
+
+# load the targeting sequences expressions
+piRNA.expression <- read.csv(file = "../../data_files/stem_diff_targeting/targeting_sRNA.csv",
+                             stringsAsFactors = F, 
+                             header  = T)
+piRNA.expression <- subset(x = voom_sRNA, 
+                          select = c(sRNA, logFC, adj.P.Val))
+colnames(piRNA.expression) <- c("piRNA", "piRNA_logFC", "piRNA_pval")  
+
+
+#load in the gene expression from RNA seq experiment
+gene.expression <- read.csv(file = "../../data_files/RNAseq_expressed_genes/GSC_vs_nonGSC_all_differentially_expressed_genes.csv", 
+                            sep = ",", 
+                            stringsAsFactors = F)
+
+gene.expression <- subset(gene_expression, 
+                          select = c(hgnc_symbol, logFC, adj.P.Val))
+colnames(gene.expression) <- c("gene", "gene_logFC", "gene_pval")  
 
 alignments <- list()
 alignments[[1]] <-  read.delim(file = "../../data_files/stem_diff_alignments/temp_alignments/cDNA_temp_alignments_bt2v1score2.txt",
