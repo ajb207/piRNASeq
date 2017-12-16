@@ -250,7 +250,9 @@ plotCoexpression <-
   }
 
 
-
+# construct the coepression data aframe for use later
+# personal use code
+#
 buildCoexpression <- 
   function(alignments, #converted before hand,
            piRNA.expression,
@@ -265,9 +267,6 @@ buildCoexpression <-
     coexpression <-merge(x = coexpression,
                          y = gene.expression,
                          by = "gene")
-    #colnames(coexpression)[5:6] <- c( "gene_logFC", "gene_pval")
-    
-    
     return(coexpression)
     
   }
