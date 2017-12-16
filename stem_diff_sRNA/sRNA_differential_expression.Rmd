@@ -466,11 +466,22 @@ voom.counts <- cpm(dge.counts, log = TRUE, prior.count = 3)
 plotMDS(voom.counts, labels = colnames(read.counts), cex = 1, main = "MDS Plot for piRNA Expressions", dim.plot = c(1,2))
 
 #create the linear fit for the data
-fit <- eBayes(lmFit(voom.counts,design), trend = TRUE)
+fit <- 
+  voom.counts %>%
+  lmFit(design) %>%
+  eBayes(trend = TRUE)
 
 #sort fold changes sorted by p-value
-voom.sRNA <- topTable(fit, coef = "celltypeS", sort.by="logFC", number =nrow(voom.counts) )
-voom.top <- topTable(fit,coef = "celltypeS", sort.by="logFC", number =nrow(voom.counts),lfc = 2,p.value = 0.05)
+voom.sRNA <- topTable(fit = fit, 
+                      coef = "celltypeS", 
+                      sort.by="logFC",
+                      number =nrow(voom.counts) )
+voom.top <- topTable(fit = fit,
+                     coef = "celltypeS", 
+                     sort.by="logFC",
+                     number =nrow(voom.counts),
+                     lfc = 2,
+                     p.value = 0.05)
 
 #adding the reads names into its own column for merging
 voom.sRNA$sRNA <- rownames(voom.sRNA)
@@ -479,8 +490,17 @@ voom.top.sRNA$sRNA <- rownames(voom.top.sRNA)
 
 
 #write.table(rownames(voom.sRNA), "../data/temp_read_names.txt", quote=F, row.names = F, col.names = F)
-write.table(voom.sRNA, "../data/GSC_vs_nonGSC_targeting_sequences_differential_expression/GSC_vs_nonGSC_all_differentially_expressed_targeting_sequences.csv", quote=F, row.names = T, col.names = T, sep = ",")
-write.table(voom.top.sRNA, "../data/GSC_vs_nonGSC_targeting_sequences_differential_expression/GSC_vs_nonGSC_top_pval<05_differentially_expressed_targeting_sequences.csv", quote=F, row.names = T, col.names = T, sep = ",")
+write.table(x = voom.sRNA, 
+            file = "../data/GSC_vs_nonGSC_targeting_sequences_differential_expression/GSC_vs_nonGSC_all_differentially_expressed_targeting_sequences.csv",
+            quote=F, 
+            row.names = T, 
+            col.names = T, 
+            sep = ",")
+write.table(x = voom.top.sRNA, file = "../data/GSC_vs_nonGSC_targeting_sequences_differential_expression/GSC_vs_nonGSC_top_pval<05_differentially_expressed_targeting_sequences.csv",
+            quote=F,
+            row.names = T,
+            col.names = T, 
+            sep = ",")
 
 
 ```
@@ -493,12 +513,15 @@ write.table(voom.top.sRNA, "../data/GSC_vs_nonGSC_targeting_sequences_differenti
 ```{r SRA, echo = FALSE}
 
 #import the desired read counts
-read.counts <- read.delim("../sRNA_counts/sra_all_sa_og_norRNA_25_33_read.counts.txt", sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
+read.counts <- read.csv(file = "../sRNA_counts/sra_all_sa_og_norRNA_25_33_read.counts.txt",
+                        stringsAsFactors=FALSE, row.names = 1)[,]
 #filter <- read.table("../fastx_files/sra_all_sa_og_norRNA_list.txt", header = FALSE, stringsAsFactors = FALSE)
 #read.counts <- read.counts[(rownames(read.counts) %in% filter$V1),]
 #read.counts <- read.counts[nchar(rownames(read.counts)) >= 25 & nchar(rownames(read.counts)) <= 33,]
 
-colnames(read.counts) <- gsub(colnames(read.counts), pattern = "_sa_collapsed.fq", replacement = "")
+colnames(read.counts) <- gsub(colnames(read.counts), 
+                              pattern = "_sa_collapsed.fq", 
+                              replacement = "")
 
 #read.counts <-  read.counts[,-c(26,27,28,29,30)]
 read.counts <- read.counts[,c(26:29)]
