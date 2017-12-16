@@ -146,10 +146,15 @@ conversion <- read.table(file =  "../../conversion_sets/ensembl_conversion.txt",
 # convert the names to hgnc symbols
 for(n in 1:length(alignments)){
   temp <- alignments[[n]]
-  colnames(temp) <- c("piRNA", "transcript_id", "bp_start", "alignment_info", "mismatches")
+  colnames(temp) <- c("piRNA", "transcript.id", "bp.start", "alignment.info", "mismatches")
   # remove the transcipt name
-  temp$transcript_id <- sapply(temp$transcript_id,
-                                     FUN = function(x){unlist(strsplit(x, split = "\\|"))[2]})
+  temp$transcript.id <- sapply(temp$transcript.id,
+                               FUN = function(x){
+                                 x %>%
+                                   strsplit(split = "\\|") %>%
+                                   unlist()[2]
+                               }
+  )
   
   temp <-
     temp %>%
