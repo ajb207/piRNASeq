@@ -52,6 +52,26 @@ require(ggrepel)
 require(RColorBrewer)
 
 
+require(limma)
+require(knitr)
+require(edgeR)
+require(biomaRt)
+require(DESeq2)
+require(edgeR)
+require(ggplot2)
+require(reshape)
+require(reshape2)
+require(stringdist)
+require(apcluster)
+require(qqman)
+require(Biostrings)
+require(motifRG)
+require(stringr)
+require(scales)
+require(NMF)
+
+
+
 source('stem_diff_sRNA_functions.R')
 
 
