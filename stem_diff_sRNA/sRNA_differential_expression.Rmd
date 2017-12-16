@@ -76,24 +76,29 @@ cellline <- factor(c(1:7, 1:7), levels = 1:7)
 design <-model.matrix(~cellline + celltype)
 
 #converting to DGEList and keeping only expressions significantly above 0
-dge_counts <- DGEList(counts=read_counts)
-#dge_counts <- dge_counts[rowSums(cpm(dge_counts) >=1) >=7,]
-dge_counts <- calcNormFactors(dge_counts, method = c("TMM"))
+dge.counts <- 
+  read.counts  %>% 
+  DGEList() %>%
+  calcNormFactors(method = c('TMM'))
+#dge.counts <- dge.counts[rowSums(cpm(dge.counts) >=1) >=7,]
 
 #voom normalization
-voom_counts <- cpm(dge_counts,log=TRUE, prior.count = 3)
+voom.counts <- cpm(dge.counts,log=TRUE, prior.count = 3)
 #MDSplot
-plotMDS(dge_counts, labels = colnames(read_counts), cex = 1, main = "MDS Plot for piRNA Expressions", dim.plot = c(1,2))
+plotMDS(dge.counts, labels = colnames(read.counts), cex = 1, main = "MDS Plot for piRNA Expressions", dim.plot = c(1,2))
 
 #create the linear fit for the counts
-fit <- eBayes(lmFit(voom_counts,design), trend = TRUE)
+fit <-
+  voom.counts %>% 
+  lmFit(design = design) %>%
+  eBayes(trend = TRUE)
 
 
 #voom fold changesmiRNA_alignments
-voom_sRNA <- topTable(fit, coef = "celltypeS", sort.by="logFC", number =nrow(voom_counts) )
-voom_top <- topTable(fit,coef = "celltypeS", sort.by="logFC", number =nrow(voom_counts),lfc = 0,p.value = 0.05)
+voom_sRNA <- topTable(fit, coef = "celltypeS", sort.by="logFC", number =nrow(voom.counts) )
+voom_top <- topTable(fit,coef = "celltypeS", sort.by="logFC", number =nrow(voom.counts),lfc = 0,p.value = 0.05)
 #voomNormExp <- voomCounts$E
-#rm(celltype);rm(design.array); rm(design); rm(dge_counts)
+#rm(celltype);rm(design.array); rm(design); rm(dge.counts)
 #my name function
 
 #adding the reads names into its own column for merging
