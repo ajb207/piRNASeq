@@ -15,12 +15,18 @@ source('global.R')
 ```{r load_cluster_locations, echo = FALSE}
 
 #functions to turn the proTRAC data into a usable format
-clusterStart <- function(cluster_coordinates){
-  return(as.numeric(unlist(strsplit(cluster_coordinates, split = "-"))[1]))
-}
-clusterEnd <- function(cluster_coordinates){
-  return(as.numeric(unlist(strsplit(cluster_coordinates, split = "-"))[2]))
-}
+clusterStart <- 
+  function(cluster_coordinates){
+    cluster_coordinates %>%
+      strsplit(split = "-") %>%
+      unlist()[1] %>%
+      as.numeric() %>%
+      return()
+  }
+clusterEnd <- 
+  function(cluster_coordinates){
+    return(as.numeric(unlist(strsplit(cluster_coordinates, split = "-"))[2]))
+  }
 
 #load the proTRAC files
 protrac_folder <- "../proTRAC_files/clusters_minimum_1000/stem_diff"
@@ -28,28 +34,36 @@ file_names <- list.files(protrac_folder)
 file_names <- strtrim(file_names, 9)
 
 
-files <- list.files(protrac_folder, full.names = TRUE, recursive = TRUE, pattern = "clusters.fasta")
+files <- list.files(protrac_folder, 
+                    full.names = TRUE, 
+                    recursive = TRUE, 
+                    pattern = "clusters.fasta")
 
 #load the proTRAC cluster
-loadClusters <- function(file){
-  
-  clusters <- read.table(file, sep = "\n", stringsAsFactors = FALSE)
-  clusters <- clusters[seq(1,nrow(clusters), 2),]
-  clusters <- unlist(strsplit(clusters, split = " "))
-  
-  clusters <- matrix(data = clusters, byrow = TRUE, ncol = 6)
-  clusters <- as.data.frame(clusters)
-  clusters <- clusters[,c(1,2,6)]
-  colnames(clusters) <- c("chromosome", "coordinates", "direction")
-  clusters$coordinates <- as.character(clusters$coordinates)
-  #clusters$chromosome <- as.numeric(clusters$chromosome)
-  clusters$start <- sapply(clusters$coordinates,FUN = clusterStart)
-  clusters$end <- sapply(clusters$coordinates,FUN = clusterEnd)
-  clusters$length <- clusters$end-clusters$start
-  clusters <- subset(clusters, select = - coordinates)
-  
-  return(clusters)
-}
+loadClusters <- 
+  function(file){
+    
+    clusters <- read.table(file = file,
+                           sep = "\n", 
+                           stringsAsFactors = FALSE)
+    clusters <- clusters[seq(1,nrow(clusters), 2),]
+    clusters <- 
+      clusters %>% 
+      strsplit(split = " ") %>%
+      unlist()
+    clusters <- matrix(data = clusters, byrow = TRUE, ncol = 6)
+    clusters <- as.data.frame(clusters)
+    clusters <- clusters[,c(1,2,6)]
+    colnames(clusters) <- c("chromosome", "coordinates", "direction")
+    clusters$coordinates <- as.character(clusters$coordinates)
+    #clusters$chromosome <- as.numeric(clusters$chromosome)
+    clusters$start <- sapply(clusters$coordinates,FUN = clusterStart)
+    clusters$end <- sapply(clusters$coordinates,FUN = clusterEnd)
+    clusters$length <- clusters$end-clusters$start
+    clusters <- subset(clusters, select = - coordinates)
+    
+    return(clusters)
+  }
 
 #load the cluster for every proTRAC file
 clusters <- lapply(X = files, FUN =loadClusters)
