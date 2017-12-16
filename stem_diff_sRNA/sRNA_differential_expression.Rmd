@@ -16,10 +16,13 @@ options(scipen=999)
 
 
 #load in the gene expression from RNA seq experiment
-gene_expression <- read.csv("../../RNAseq/data/StemVsDiff_all_DE_genes.txt", sep = ",", stringsAsFactors = F)
-transcript_expression <- read.csv("../../RNAseq/data/StemVsDiff_all_DE_transcripts.csv", sep = ",", stringsAsFactors = F)
+gene_expression <- read.csv(file = "../../RNAseq/data/StemVsDiff_all_DE_genes.txt", 
+                            stringsAsFactors = F)
+transcript_expression <- read.csv(file = "../../RNAseq/data/StemVsDiff_all_DE_transcripts.csv", 
+                                  stringsAsFactors = F)
 #load in the differentially expressed genes info from the RNA seq experiment
-top_genes <- read.csv("../../RNAseq/data/StemVsDiff_top_DE_genes.txt", stringsAsFactors=FALSE)
+top_genes <- read.csv(file = "../../RNAseq/data/StemVsDiff_top_DE_genes.txt",
+                      stringsAsFactors=FALSE)
 
 conversion <- read.table("../../conversion_sets//ensembl_conversion.txt", header = T, stringsAsFactors = F, sep = "\t")
 
@@ -33,27 +36,32 @@ conversion <- read.table("../../conversion_sets//ensembl_conversion.txt", header
 ```{r piRNA_differential_expression, echo = FALSE}
 
 #import the desired read counts
-read_counts <- read.delim("../sRNA_counts/small_sa_og_norRNA_25_33_counts.txt", sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
+read.counts <- read.csv(file = "../sRNA_counts/small_sa_og_norRNA_25_33_counts.txt", 
+                        stringsAsFactors=FALSE,
+                        row.names = 1)[,]
 
 #remove non used reads
-rRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt", header = FALSE, stringsAsFactors = FALSE)
-read_counts <- read_counts[!(rownames(read_counts) %in% rRNA$V1),]
+rRNA <- read.table(file = "../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt",
+                   header = FALSE, 
+                   stringsAsFactors = FALSE)
+
+read.counts <- read.counts[!(rownames(read.counts) %in% rRNA$V1),]
 YRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_YRNA.txt", header = FALSE, stringsAsFactors = FALSE)
-read_counts <- read_counts[!(rownames(read_counts) %in% YRNA$V1),]
+read.counts <- read.counts[!(rownames(read.counts) %in% YRNA$V1),]
 
 #keep only cell lines from experiment
-read_counts <- read_counts[,4:19]
+read.counts <- read.counts[,4:19]
 #switch the cell lines
-read_counts <- read_counts[,c(9:16, 1:8)]
+read.counts <- read.counts[,c(9:16, 1:8)]
 
-read_counts <- read_counts[,-c(3,11)]
+read.counts <- read.counts[,-c(3,11)]
 
-read_counts <- read_counts[!rowSums(read_counts) == 0,]
+read.counts <- read.counts[!rowSums(read.counts) == 0,]
 
-#read_counts <- removeRepeats(read_counts)
+#read.counts <- removeRepeats(read.counts)
 #remove low counts for differential expression
-read_counts <- read_counts[rowSums(cpm(read_counts) >= 1) >= 7,]
-read_counts <- read_counts[!rowSums(read_counts) == 0,]
+read.counts <- read.counts[rowSums(cpm(read.counts) >= 1) >= 7,]
+read.counts <- read.counts[!rowSums(read.counts) == 0,]
 
 
 
