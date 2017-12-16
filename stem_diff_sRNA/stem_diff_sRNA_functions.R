@@ -1,48 +1,5 @@
 
 #compute various information about the alignments.
-alignmentInfo <- function(alignments){
-  
-  
-  #find the distance alignment occured from 3 prime end of transcript
-  #alignments$bp_end <- alignments$length - alignments$bp_start
-  #count the number of mismatches
-  #alignments$number_mismatches <- str_count(alignments$mismatches, ">")
-  
-  #finding total targets for each piRNA
-  target_number <- as.data.frame(table(unique(subset(alignments, select = c(piRNA,hgnc_symbol)))[,1]))
-  colnames(target_number) <- c("piRNA", "targets")
-  alignments <- merge(alignments, target_number, by = "piRNA")
-  
-  #find total time gene is targeted by unique piRNA
-  target_number <- as.data.frame(table(as.data.frame(unique(subset(alignments, select = c(piRNA,hgnc_symbol)))[,2])))
-  colnames(target_number) <- c("hgnc_symbol", "gene_frequency")
-  alignments <- merge(alignments, target_number, by = "hgnc_symbol")
-  
-  #denote weather the piRNA and/or the gene is differentially expressed
-  alignments$DE_piRNA <- FALSE
-  alignments$DE_piRNA[alignments$piRNA %in% rownames(voom_top)] <- TRUE
-  
-  alignments$DE_gene <- FALSE
-  alignments$DE_gene[alignments$hgnc_symbol %in% top_genes$hgnc_symbol] <- TRUE
-  
-  #denote whether the 1T 10A bias is seen
-  #alignments$`1T` <-  ifelse(sapply(alignments$piRNA, substr,1,1) == "T",TRUE,FALSE) 
-  #alignments$`10A` <-  ifelse(sapply(alignments$piRNA, substr,10,10) == "A",TRUE,FALSE)
-  #alignments$`1T10A` <- ifelse((alignments$`1T` & alignments$`10A`), TRUE, FALSE)
-  
-  
-  target_number <- as.data.frame(table(unique(subset(alignments, select = c(piRNA,transcript_id)))[,2]))
-  colnames(target_number) <- c("transcript", "targets")
-  #rpkm <- merge(subset(alignments, select = c(transcript, length)) , target_number, by = "transcript")
-  #rpkm$rpkm <- rpkm$targets/((rpkm$length)/1000)
-  
-  #alignments <- merge(alignments, subset(rpkm, select = c(transcript, rpkm)), by = "transcript")
-  
-  return(alignments)
-}
-
-
-#compute various information about the alignments.
 alignmentInfo <- 
   function(alignments){
     
@@ -53,20 +10,29 @@ alignmentInfo <-
     #alignments$number_mismatches <- str_count(alignments$mismatches, ">")
     
     #finding total targets for each piRNA
-    target_number <- 
+    target.number <- 
       alignments %>% 
       subset(select = c(piRNA,hgnc_symbol)) %>%
       table(unique()[,1]) %>%
       as.data.frame()
-    colnames(target_number) <- c("piRNA", "targets")
+    colnames(target.number) <- c("piRNA", "targets")
     alignments <- merge(alignments,
-                        target_number,
+                        target.number,
                         by = "piRNA")
     
     #find total time gene is targeted by unique piRNA
-    target_number <- as.data.frame(table(as.data.frame(unique(subset(alignments, select = c(piRNA,hgnc_symbol)))[,2])))
-    colnames(target_number) <- c("hgnc_symbol", "gene_frequency")
-    alignments <- merge(alignments, target_number, by = "hgnc_symbol")
+    target.number <- 
+      alignments %>%
+      subset(select = c(piRNA, hgnc_symbol)) %>%
+      unique()[,2] %>%
+      as.data.frame() %>%
+      table() %>%
+      as.data.frame()
+    
+    colnames(target.number) <- c("hgnc_symbol", "gene_frequency")
+    alignments <- merge(alignments,
+                        target.number, 
+                        by = "hgnc_symbol")
     
     #denote weather the piRNA and/or the gene is differentially expressed
     alignments$DE_piRNA <- FALSE
@@ -81,9 +47,14 @@ alignmentInfo <-
     #alignments$`1T10A` <- ifelse((alignments$`1T` & alignments$`10A`), TRUE, FALSE)
     
     
-    target_number <- as.data.frame(table(unique(subset(alignments, select = c(piRNA,transcript_id)))[,2]))
-    colnames(target_number) <- c("transcript", "targets")
-    #rpkm <- merge(subset(alignments, select = c(transcript, length)) , target_number, by = "transcript")
+    target.number <- 
+      alignments %>%
+      subset(select = c(piRNA,transcript_id)) %>% 
+      unique()[,2] %>%
+      table() %>%
+      as.data.frame()
+    colnames(target.number) <- c("transcript", "targets")
+    #rpkm <- merge(subset(alignments, select = c(transcript, length)) , target.number, by = "transcript")
     #rpkm$rpkm <- rpkm$targets/((rpkm$length)/1000)
     
     #alignments <- merge(alignments, subset(rpkm, select = c(transcript, rpkm)), by = "transcript")
