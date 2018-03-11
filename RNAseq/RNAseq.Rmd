@@ -10,16 +10,7 @@ This is RNAseq analysis of the comparison between GSC vs differentiated NPC (10 
 
 ```{r, cache=TRUE,echo=FALSE,eval=TRUE,warning=FALSE}
 
-
-
 source('global.R')
-source('RNAseq_functions.R')
-
-
-
-
-
-
 ```
 
 
@@ -28,10 +19,11 @@ source('RNAseq_functions.R')
 ```{r GSC_vs_nonGSC}
 
 # load in the star counts
-read.counts <-importStarCounts("../../data_files/star_v5/", column = 4)
+read.counts <- importStarCounts(folder = "../../data_files/star_v5/", 
+                                column = 4)
 # removing uneeded text from column names
 colnames(read.counts) <- gsub(pattern = "_dna_ReadsPerGene.out.tab", 
-                              "",
+                              replacement = "",
                               colnames(read.counts))
 
 
@@ -57,11 +49,12 @@ read.counts <- read.counts[!rownames(read.counts)=="N_ambiguous",]
 
 
 # remove unnecesary cell lines
-read.counts <- subset(read.counts,
-                      select = -c(`1123++`, `528++`, 
-                                  `1123-`,`528-`, 
-                                  hNP1_old, hNP1_new, 
-                                  `17231`, `16157` ))
+read.counts <- 
+  read.counts %>%
+  subset(select = -c(`1123++`, `528++`, 
+              `1123-`,`528-`, 
+              hNP1_old, hNP1_new, 
+              `17231`, `16157` ))
 
 # write this experiments counts to a file
 write.table(x = read.counts, 
@@ -84,7 +77,7 @@ design <- model.matrix(~ cellline + celltype)
 # removing low count genes
 # convert to DGE List
 # Normalize
-dge_counts <- 
+dge.counts <- 
   read.counts[rowSums(cpm(read.counts) >= 1) >= 8,] %>%
   DGEList() %>%
   calcNormFactors(method = c("TMM"))
@@ -92,11 +85,11 @@ dge_counts <-
 
 
 #voom for creating converting RNA seq reads to microaray data for the pipeline
-voom_counts <- voom(counts = dge_counts, 
+voom.counts <- voom(counts = dge.counts, 
                     design = design,
                     plot=TRUE)
 #MDS plot of the data
-plotMDS(x = dge_counts, 
+plotMDS(x = dge.counts, 
         cex = 1,
         main = "MDS of Stem vs Diff",
         labels = colnames(read.counts),
@@ -107,35 +100,34 @@ plotMDS(x = dge_counts,
 
 #linear fit and eBayes funtions for differential expression
 fit <-
-  eBayes(
-    lmFit(object = voom_counts,
-          design = design)
-    )
+  voom.counts %>%
+  lmFit(design = design) %>%
+  eBayes()
 
 #voom fold changes and p values for all genes
-voom_all <- topTable(fit = fit,
+voom.all <- topTable(fit = fit,
                      coef = "celltypeS", 
                      sort.by ="p",
-                     number = nrow(voom_counts)
+                     number = nrow(voom.counts)
                      )
 #voom fold changes and p values based on significant hits
 voom_top <- topTable(fit = fit,
                      coef = "celltypeS",
                      sort.by="p",
-                     number =nrow(voom_counts),
+                     number =nrow(voom.counts),
                      lfc = 0,
                      p.value = 0.05)
 
 
 #name conversion to HGNC symbols
-voom_all_HGNC <- EnsembltoHGNC(voom_all)
+voom.all_HGNC <- EnsembltoHGNC(voom.all)
 voom_top_HGNC <- EnsembltoHGNC(voom_top)
 
 
 #saving the  top tables for use in other scripts
 #commented out for use only when needed
 
-write.table(x = voom_all_HGNC, 
+write.table(x = voom.all_HGNC, 
             file = "../../data_files/RNAseq_expressed_genes/GSC_vs_nonGSC_all_differentially_expressed_genes.csv",
             quote = FALSE, 
             sep = ",", 
@@ -145,7 +137,7 @@ write.table(x = voom_top_HGNC,
             quote = FALSE, 
             sep = ",",
             row.names = T)
-#write.table(x = as.data.frame(voom_counts$E), "../data/star_v5_normalized_counts.txt", quote = FALSE,  col.names = TRUE, sep = ",")
+#write.table(x = as.data.frame(voom.counts$E), "../data/star_v5_normalized_counts.txt", quote = FALSE,  col.names = TRUE, sep = ",")
 
 
 
@@ -158,11 +150,11 @@ conversion <- read.table(file = "../../conversion_sets/ensembl_to_entrez.txt",
                          stringsAsFactors = F, 
                          sep = "\t", 
                          header = T)
-stats <- as.data.frame(voom_all_HGNC$logFC)
-stats$hgnc_symbol <- voom_all_HGNC$hgnc_symbol
+stats <- as.data.frame(voom.all_HGNC$logFC)
+stats$hgnc_symbol <- voom.all_HGNC$hgnc_symbol
 #stats <- stats[stats$symbol != "",]
 stats <- merge(stats,conversion, by = 'hgnc_symbol')
-ranks <- stats$`voom_all_HGNC$logFC`
+ranks <- stats$`voom.all_HGNC$logFC`
 stats$entrez_gene_id <- as.character(stats$entrez_gene_id)
 names(ranks) <- stats$entrez_gene_id
 ranks <- sort(ranks)
@@ -203,7 +195,7 @@ dev.off()
 read.counts <-importStarCounts("../../data_files/star_v5/", column = 4)
 # removing uneeded text from column names
 colnames(read.counts) <- gsub(pattern = "_dna_ReadsPerGene.out.tab", 
-                              "",
+                              replacement = "",
                               colnames(read.counts))
 
 # write the read counts for later reference
@@ -228,9 +220,10 @@ colnames(read.counts) <- c("387++","456++","3359++","3691++","3832++","4121++","
                            "hNP1_old","hNP1_new","17231","16157")
 
 # remove unneccessary cell lines
-read.counts <- subset(read.counts, 
-                      select = -c(`387-`,`456-`, `3359-`,`3691-`,`3832-`,`4121-`,`4302-`,`H2S-`,
-                                  `1123++`, `528++`, `1123-`, `528-`,`17231`,`16157`))
+read.counts <- 
+  read.counts %>%
+  subset(select = -c(`387-`,`456-`, `3359-`,`3691-`,`3832-`,`4121-`,`4302-`,`H2S-`,
+                     `1123++`, `528++`, `1123-`, `528-`,`17231`,`16157`))
 
 
 #organize to that the non-GSCs are the first and the control samples. GSCs are the treatments
@@ -247,7 +240,7 @@ design <- model.matrix(~ celltype)
 # converting to DGEList
 # removing low count genes
 # normalization
-dge_counts <- 
+dge.counts <- 
   read.counts[rowSums(cpm(read.counts) >= 1) >= 2,] %>%
   DGEList() %>%
   calcNormFactors(method = c("TMM"))
@@ -255,11 +248,11 @@ dge_counts <-
 
 
 # voom for creating converting RNA seq reads to microaray data for the pipeline
-voom_counts <-voom(counts = dge_counts, 
+voom.counts <-voom(counts = dge.counts, 
                    design = design, 
                    plot = TRUE)
 #MDS plot of the data
-plotMDS(x = dge_counts,
+plotMDS(x = dge.counts,
         cex = 1,
         main = "MDS of Stem vs Diff",
         labels = colnames(read.counts),
@@ -270,27 +263,26 @@ plotMDS(x = dge_counts,
 
 #linear fit and eBayes funtions for differential expression
 fit <- 
-  eBayes(
-    lmFit(object = voom_counts,
-          design = design)
-  )
+  voom.counts %>%
+  lmFit(design = design) %>%
+  eBayes()
 
 #voom fold changes and p values for all genes
-voom_all_genes <- topTable(fit = fit, 
+voom.all_genes <- topTable(fit = fit, 
                            coef = "celltypeGSC",
                            sort.by="p",
-                           number =nrow(voom_counts))
+                           number =nrow(voom.counts))
 #voom fold changes and p values based on significant hits
 voom_top <- topTable(fit = fit,
                      coef = "celltypeGSC",
                      sort.by = "p",
-                     number = nrow(voom_counts),
+                     number = nrow(voom.counts),
                      lfc = 0,
                      p.value = 0.05)
 
 
 #name conversion to HGNC symbols
-voom_all_genes_HGNC <- EnsembltoHGNC(voom_all_genes)
+voom.all_genes_HGNC <- EnsembltoHGNC(voom.all_genes)
 voom_top_HGNC <- EnsembltoHGNC(voom_top)
 
 
@@ -299,7 +291,7 @@ voom_top_HGNC <- EnsembltoHGNC(voom_top)
 
 
 # write expression results to file
-write.table(x = voom_all_HGNC, 
+write.table(x = voom.all_HGNC, 
             file = "../../data_files/RNAseq_expressed_genes/GSC_vs_HNPC_all_differentially_expressed_genes.csv",
             quote = FALSE,
             sep = ",",
@@ -316,13 +308,13 @@ conversion <- read.table(file = "../../conversion_sets/ensembl_to_entrez.txt",
                          stringsAsFactors = F, 
                          sep = "\t",
                          header = T)
-stats <- as.data.frame(voom_all_HGNC$logFC)
-stats$hgnc_symbol <- voom_all_HGNC$hgnc_symbol
+stats <- as.data.frame(voom.all_HGNC$logFC)
+stats$hgnc_symbol <- voom.all_HGNC$hgnc_symbol
 #stats <- stats[stats$symbol != "",]
 stats <- merge(stats,
                conversion,
                by = 'hgnc_symbol')
-ranks <- stats$`voom_all_HGNC$logFC`
+ranks <- stats$`voom.all_HGNC$logFC`
 stats$entrez_gene_id <- as.character(stats$entrez_gene_id)
 names(ranks) <- stats$entrez_gene_id
 ranks <- sort(ranks)
@@ -385,7 +377,7 @@ design <- model.matrix(~ cellline + celltype)
 # remove low count reads
 # convert to DGE list
 # normalize the data
-dge_counts <- 
+dge.counts <- 
   read.counts[rowSums(cpm(read.counts) >= 1) >= 8,] %>%
   DGEList() %>%
   calcNormFactors(method = c("TMM"))
@@ -393,11 +385,11 @@ dge_counts <-
 
 
 #voom for creating converting RNA seq reads to microaray data for the pipeline
-voom_counts <-voom(counts = dge_counts, 
+voom.counts <-voom(counts = dge.counts, 
                    design = design,
                    plot=TRUE)
 # MDS plot of the data
-plotMDS(x = dge_counts,
+plotMDS(x = dge.counts,
         cex = 1, 
         main = "MDS of Stem vs Diff", 
         labels = colnames(read.counts), 
@@ -408,21 +400,20 @@ plotMDS(x = dge_counts,
 
 #linear fit and eBayes funtions for differential expression
 fit <-
-  eBayes(
-    lmFit(object = voom_counts,
-        design = design)
-  )
+  voom.count %>% 
+  lmFit(design = design) %>%
+  eBayes()
 
 # voom fold changes and p values for all genes
-voom_all <- topTable(fit = fit, 
+voom.all <- topTable(fit = fit, 
                      coef = "celltypeS",
                      sort.by="p", 
-                     number =nrow(voom_counts))
+                     number =nrow(voom.counts))
 # voom fold changes and p values based on significant hits
 voom_top <- topTable(fit = fit,
                      coef = "celltypeS", 
                      sort.by="p",
-                     number =nrow(voom_counts),
+                     number =nrow(voom.counts),
                      lfc = 0,
                      p.value = 0.05)
 
@@ -439,13 +430,13 @@ voom_top_HGNC <- merge(x = voom_top,
                        y = conversion[,c(2,3)], 
                        by = "transcript_id")
 
-voom_all$transcript_id <- rownames(voom_all)
-voom_all_HGNC <- merge(x = voom_all,
+voom.all$transcript_id <- rownames(voom.all)
+voom.all_HGNC <- merge(x = voom.all,
                        y = conversion[,c(2,3)], 
                        by = "transcript_id")
 
 # write the differently expressed transcripts to file
-write.table(x = voom_all_HGNC,
+write.table(x = voom.all_HGNC,
             file = "../../data_files/RNAseq_expressed_genes/GSC_vs_nonGSC_all_differentially_expressed_transcripts.csv",
             quote = FALSE, 
             sep = ",",
@@ -502,20 +493,20 @@ design <- model.matrix(~  kd + celltype)
 # removing low count reads
 # convert to DGE List
 # Normalize
-dge_counts <-
+dge.counts <-
   read.counts[rowSums(cpm(read.counts) >= 1) >= 4,] %>% 
   DGEList() %>%
   calcNormFactors(method = c("TMM"))
 
 
 #voom for creating converting RNA seq reads to microaray data for the pipeline
-voom_counts <-voom(counts = dge_counts, 
+voom.counts <-voom(counts = dge.counts, 
                    design = design, 
                    plot = T)
 
 
 #MDS plot of the data
-plotMDS(x = dge_counts, 
+plotMDS(x = dge.counts, 
         cex = 1, 
         main = "MDS of Stem vs Diff", 
         labels = colnames(read.counts), 
@@ -523,7 +514,7 @@ plotMDS(x = dge_counts,
         dim.plot = c(1,2), 
         gene.selection = 'common')
 
-#fit <- lmFit(voom_counts,design)
+#fit <- lmFit(voom.counts,design)
 
 #contrasts <- makeContrasts(((cellKD.2+cellWT.2)/2)-(cellKD.4+cellKD.4)/2  , levels = design)
 #fit <- contrasts.fit(fit, contrasts)
@@ -532,34 +523,34 @@ plotMDS(x = dge_counts,
 #linear fit and eBayes funtions for differential expression
 fit <-  
   eBayes(
-    lmFit(object = voom_counts,
+    lmFit(object = voom.counts,
           design = design))
 
 #voom fold changes and p values for all genes
-voom_all <- topTable(fit = fit,
+voom.all <- topTable(fit = fit,
                      coef = "celltypeS", 
                      sort.by="p",
-                     number =nrow(voom_counts))
+                     number =nrow(voom.counts))
 #voom fold changes and p values based on significant hits
 voom_top <- topTable(fit = fit,
                      coef = "celltypeS", 
                      sort.by="p",
-                     number =nrow(voom_counts),
+                     number =nrow(voom.counts),
                      lfc = 2,
                      p.value = 0.05)
 
 
 #name conversion to HGNC symbols
-voom_all_HGNC <- EnsembltoHGNC(voom_all)
+voom.all_HGNC <- EnsembltoHGNC(voom.all)
 voom_top_HGNC <- EnsembltoHGNC(voom_top)
 
 
  #saving the  top tables for use in other scripts
 #commented out for use only when needed
 
-#write.table(x = voom_all_HGNC, "../data/StemVsDiff_all_DE_genes.txt", quote = FALSE, sep = ",", row.names = F)
+#write.table(x = voom.all_HGNC, "../data/StemVsDiff_all_DE_genes.txt", quote = FALSE, sep = ",", row.names = F)
 #write.table(x = voom_top_HGNC, "../data/StemVsDiff_top_DE_genes.txt", quote = FALSE, sep = ",", row.names = F)
-#write.table(x = as.data.frame(voom_counts$E), "../data/star_v5_normalized_counts.txt", quote = FALSE,  col.names = TRUE, sep = ",")
+#write.table(x = as.data.frame(voom.counts$E), "../data/star_v5_normalized_counts.txt", quote = FALSE,  col.names = TRUE, sep = ",")
 
 
 

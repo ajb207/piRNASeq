@@ -7,23 +7,7 @@ output: html_document
 
 
 ```{r setup, include=FALSE, echo = FALSE}
-
-require(limma)
-require(knitr)
-require(edgeR)
-require(biomaRt)
-require(DESeq2)
-require(edgeR)
-require(ggplot2)
-require(reshape)
-require(reshape2)
-require(Biostrings)
-require(plotly)
-require(qqman)
-require(scales)
-require(ggrepel)
-require(RColorBrewer)
-
+source('global.R')
 ```
 
 
@@ -31,12 +15,22 @@ require(RColorBrewer)
 ```{r load_cluster_locations, echo = FALSE}
 
 #functions to turn the proTRAC data into a usable format
-clusterStart <- function(cluster_coordinates){
-  return(as.numeric(unlist(strsplit(cluster_coordinates, split = "-"))[1]))
-}
-clusterEnd <- function(cluster_coordinates){
-  return(as.numeric(unlist(strsplit(cluster_coordinates, split = "-"))[2]))
-}
+clusterStart <- 
+  function(cluster_coordinates){
+    cluster_coordinates %>%
+      strsplit(split = "-") %>%
+      unlist()[1] %>%
+      as.numeric() %>%
+      return()
+  }
+clusterEnd <- 
+  function(cluster_coordinates){
+    cluster_coordinates %>%
+    strsplit(split = "-") %>%
+    unlist()[2] %>%
+    as.numeric() %>%
+    return()
+  }
 
 #load the proTRAC files
 protrac_folder <- "../proTRAC_files/clusters_minimum_1000/stem_diff"
@@ -44,28 +38,39 @@ file_names <- list.files(protrac_folder)
 file_names <- strtrim(file_names, 9)
 
 
-files <- list.files(protrac_folder, full.names = TRUE, recursive = TRUE, pattern = "clusters.fasta")
+files <- list.files(protrac_folder, 
+                    full.names = TRUE, 
+                    recursive = TRUE, 
+                    pattern = "clusters.fasta")
 
 #load the proTRAC cluster
-loadClusters <- function(file){
-  
-  clusters <- read.table(file, sep = "\n", stringsAsFactors = FALSE)
-  clusters <- clusters[seq(1,nrow(clusters), 2),]
-  clusters <- unlist(strsplit(clusters, split = " "))
-  
-  clusters <- matrix(data = clusters, byrow = TRUE, ncol = 6)
-  clusters <- as.data.frame(clusters)
-  clusters <- clusters[,c(1,2,6)]
-  colnames(clusters) <- c("chromosome", "coordinates", "direction")
-  clusters$coordinates <- as.character(clusters$coordinates)
-  #clusters$chromosome <- as.numeric(clusters$chromosome)
-  clusters$start <- sapply(clusters$coordinates,FUN = clusterStart)
-  clusters$end <- sapply(clusters$coordinates,FUN = clusterEnd)
-  clusters$length <- clusters$end-clusters$start
-  clusters <- subset(clusters, select = - coordinates)
-  
-  return(clusters)
-}
+loadClusters <- 
+  function(file){
+    
+    clusters <- read.table(file = file,
+                           sep = "\n", 
+                           stringsAsFactors = FALSE)
+    clusters <- clusters[seq(1,nrow(clusters), 2),]
+    clusters <- 
+      clusters %>% 
+      strsplit(split = " ") %>%
+      unlist()
+    clusters <- 
+      clusters %>%
+      matrix(byrow = TRUE, 
+             ncol = 6) %>%
+      as.data.frame()
+    clusters <- clusters[,c(1,2,6)]
+    colnames(clusters) <- c("chromosome", "coordinates", "direction")
+    clusters$coordinates <- as.character(clusters$coordinates)
+    #clusters$chromosome <- as.numeric(clusters$chromosome)
+    clusters$start <- sapply(clusters$coordinates,FUN = clusterStart)
+    clusters$end <- sapply(clusters$coordinates,FUN = clusterEnd)
+    clusters$length <- clusters$end-clusters$start
+    clusters <- subset(clusters, select = - coordinates)
+    
+    return(clusters)
+  }
 
 #load the cluster for every proTRAC file
 clusters <- lapply(X = files, FUN =loadClusters)
@@ -324,19 +329,20 @@ print(
 
 #test <- all_clusters[(all_clusters$chromosome == 2 & (all_clusters$start > 68556068) & (all_clusters$start < 68836068)),  ]
 
-cluster_plot <- function(chromosome){
-  #create the data frame for ggplot to use
-  data <- all_clusters[all_clusters$chromosome == chromosome,]
-  
-  ggplot(data, aes(x=start, xend=end, y=cell_line, yend=cell_line, color= cell_type)) +
-    geom_segment(size=3) +
-    geom_point(size=3) +
-    geom_point(aes(x=end), size=2, shape = 18) +
-    ggtitle(paste("Chromosome", chromosome, collapse = " ")) + 
-    ylab("Cell Line") + 
-    xlab("Cluster Location") +
-    scale_x_continuous(labels = comma)
-}
+cluster_plot <- 
+  function(chromosome){
+    #create the data frame for ggplot to use
+    data <- all_clusters[all_clusters$chromosome == chromosome,]
+    
+    ggplot(data, aes(x=start, xend=end, y=cell_line, yend=cell_line, color= cell_type)) +
+      geom_segment(size=3) +
+      geom_point(size=3) +
+      geom_point(aes(x=end), size=2, shape = 18) +
+      ggtitle(paste("Chromosome", chromosome, collapse = " ")) + 
+      ylab("Cell Line") + 
+      xlab("Cluster Location") +
+      scale_x_continuous(labels = comma)
+  }
 
 plots <- lapply(X = sort(unique(all_clusters$chromosome), decreasing = FALSE), FUN = cluster_plot)
 print(plots)

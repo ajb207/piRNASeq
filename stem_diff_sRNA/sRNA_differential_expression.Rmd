@@ -8,165 +8,21 @@ output: html_document
 
 
 ```{r setup, include=FALSE}
-
-require(limma)
-require(knitr)
-require(edgeR)
-require(biomaRt)
-require(DESeq2)
-require(edgeR)
-require(ggplot2)
-require(reshape)
-require(reshape2)
-require(stringdist)
-require(apcluster)
-require(qqman)
-require(Biostrings)
-require(motifRG)
-require(stringr)
-require(scales)
-require(NMF)
-
-
+source('global.R')
 #force R to not use scientific notation
 options(scipen=999)
-
-#compute various information about the alignments.
-alignmentInfo <- function(alignments){
-  
-  
-  #find the distance alignment occured from 3 prime end of transcript
-  #alignments$bp_end <- alignments$length - alignments$bp_start
-  #count the number of mismatches
-  #alignments$number_mismatches <- str_count(alignments$mismatches, ">")
-  
-  #finding total targets for each piRNA
-  target_number <- as.data.frame(table(unique(subset(alignments, select = c(piRNA,hgnc_symbol)))[,1]))
-  colnames(target_number) <- c("piRNA", "targets")
-  alignments <- merge(alignments, target_number, by = "piRNA")
-  
-  #find total time gene is targeted by unique piRNA
-  target_number <- as.data.frame(table(as.data.frame(unique(subset(alignments, select = c(piRNA,hgnc_symbol)))[,2])))
-  colnames(target_number) <- c("hgnc_symbol", "gene_frequency")
-  alignments <- merge(alignments, target_number, by = "hgnc_symbol")
-  
-  #denote weather the piRNA and/or the gene is differentially expressed
-  alignments$DE_piRNA <- FALSE
-  alignments$DE_piRNA[alignments$piRNA %in% rownames(voom_top)] <- TRUE
-
-  alignments$DE_gene <- FALSE
-  alignments$DE_gene[alignments$hgnc_symbol %in% top_genes$hgnc_symbol] <- TRUE
-
-  #denote whether the 1T 10A bias is seen
-  #alignments$`1T` <-  ifelse(sapply(alignments$piRNA, substr,1,1) == "T",TRUE,FALSE) 
-  #alignments$`10A` <-  ifelse(sapply(alignments$piRNA, substr,10,10) == "A",TRUE,FALSE)
-  #alignments$`1T10A` <- ifelse((alignments$`1T` & alignments$`10A`), TRUE, FALSE)
-  
-  
-  target_number <- as.data.frame(table(unique(subset(alignments, select = c(piRNA,transcript_id)))[,2]))
-  colnames(target_number) <- c("transcript", "targets")
-  #rpkm <- merge(subset(alignments, select = c(transcript, length)) , target_number, by = "transcript")
-  #rpkm$rpkm <- rpkm$targets/((rpkm$length)/1000)
-  
-  #alignments <- merge(alignments, subset(rpkm, select = c(transcript, rpkm)), by = "transcript")
-  
-  return(alignments)
-}
-
-
-removeRepeats <- function(read_counts){
-  
-  YRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_YRNA.txt", header = FALSE, stringsAsFactors = FALSE)
-  snoRNA <- read.table("../alignments/biogenesis_alignments_norRNA_25_33/small_sa_og_norRNA_alignments_snoRNA.txt", header = FALSE, stringsAsFactors = FALSE)
-  
-  rmsk_plus40 <- read.table("../alignments/small_sa_og_norRNA_alignments_repeatmasker_plus40.txt", header = FALSE, stringsAsFactors = FALSE)
-  rmsk_plus40_tRNA <- rmsk_plus40[grepl(pattern = "tRNA", rmsk_plus40$V2),]
-  #rmsk <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_repeatmasker.txt", header = FALSE, stringsAsFactors = FALSE, sep = "\t")
-  rmsk <- read.table("../alignments/small_sa_og_norRNA_alignments_repeatmasker_plus40.txt", header = FALSE, stringsAsFactors = FALSE, sep = "\t")
-  
-  
-  rmsk$Family <- ifelse(grepl("tRNA", rmsk$V2), "tRNA", 
-                        ifelse(grepl(")n", rmsk$V2), "Simple", 
-                               ifelse(grepl("Alu", rmsk$V2), "Alu", 
-                                      ifelse(rmsk$V2 %in% c("U1", "U2", "U3", "U4", "U5", "U6", "U7", "U8"), "U", 
-                                             ifelse(grepl("HY", rmsk$V2), "Y-RNA", 
-                                                    ifelse(grepl(pattern =  paste(c("L1", "L2", "L3", "L4", "L5", "L6"), collapse = "|"), rmsk$V2), "LINE", 
-                                                           ifelse(grepl("MIR", rmsk$V2), "MIR", "other" )))))))
-  
-  rmsk$Family[rmsk$V2 == "5S"] <- "5S"
-  rmsk$Family[rmsk$V2 == "7SLRNA"] <- "7SLRNA"
-  rmsk$Family[rmsk$V2 == "7SK"] <- "7SK"
-  
-  
-  
-  
-  
-  
-  #read_counts <- read_counts[!(rownames(read_counts) %in% tRNA$V1),]
-  #read_counts <- read_counts[!(rownames(read_counts) %in% lncRNA$V1),]
-  read_counts <- read_counts[!(rownames(read_counts) %in% YRNA$V1),]
-  #read_counts <- read_counts[!(rownames(read_counts) %in% snoRNA$V1),]
-  read_counts <- read_counts[!(rownames(read_counts) %in% rmsk$V1[rmsk$Family == "Simple"]),]
-  read_counts <- read_counts[!(rownames(read_counts) %in% rmsk$V1[rmsk$Family == "Alu"]),]
-  read_counts <- read_counts[!(rownames(read_counts) %in% rmsk$V1[rmsk$Family == "5S"]),]
-  read_counts <- read_counts[!(rownames(read_counts) %in% rmsk$V1[rmsk$Family == "7SLRNA"]),]
-  read_counts <- read_counts[!(rownames(read_counts) %in% rmsk$V1[rmsk$Family == "7SK"]),]
-  
-  return(read_counts)
-}
-
-#create a fasta file from a list of sequences
-createpiRNAFasta <- function(fileName, extension){
-  
-  #read in the old file
-  fileText <- readLines(con  =fileName)
-  
-  newText <-vector(length = length(fileText)*2)
-  
-  #change name
-  n <- 1
-  for(line in seq(1,length(newText),2)){
-    #the fasta sequence to be inverted
-    sequence <- fileText[n]
-    #go to each letter and switch it
-    newText[line] <- paste(">",sequence, sep = "") 
-    n <- n + 1
-  }
-  
-  n <- 1
-  for(line in seq(2,length(newText),2)){
-    sequence <- fileText[n]
-    #go to each letter and switch it
-    newText[line] <- sequence
-    n <- n + 1
-  }
-  
-  return(newText)
-  #write.table(derp, "test.fa", sep = "\t", row.names = FALSE, col.names = FALSE, quote = FALSE)
-}
-
-
-#trim reads to only the desired length
-trimFastaTo <- function(fileName, from, to){
-  
-  require(Biostrings)
-  #read in the old file
-  fasta <- readDNAStringSet(fileName)
-  
-  fasta <- stackStrings(fasta,from=from,to=to,Lpadding.letter = "A", Rpadding.letter = "A")
-  
-  return(fasta)
-
-}
 
 
 
 
 #load in the gene expression from RNA seq experiment
-gene_expression <- read.csv("../../RNAseq/data/StemVsDiff_all_DE_genes.txt", sep = ",", stringsAsFactors = F)
-transcript_expression <- read.csv("../../RNAseq/data/StemVsDiff_all_DE_transcripts.csv", sep = ",", stringsAsFactors = F)
+gene_expression <- read.csv(file = "../../RNAseq/data/StemVsDiff_all_DE_genes.txt", 
+                            stringsAsFactors = F)
+transcript_expression <- read.csv(file = "../../RNAseq/data/StemVsDiff_all_DE_transcripts.csv", 
+                                  stringsAsFactors = F)
 #load in the differentially expressed genes info from the RNA seq experiment
-top_genes <- read.csv("../../RNAseq/data/StemVsDiff_top_DE_genes.txt", stringsAsFactors=FALSE)
+top_genes <- read.csv(file = "../../RNAseq/data/StemVsDiff_top_DE_genes.txt",
+                      stringsAsFactors=FALSE)
 
 conversion <- read.table("../../conversion_sets//ensembl_conversion.txt", header = T, stringsAsFactors = F, sep = "\t")
 
@@ -179,28 +35,37 @@ conversion <- read.table("../../conversion_sets//ensembl_conversion.txt", header
 
 ```{r piRNA_differential_expression, echo = FALSE}
 
+# TODO replace with dplyr stuff
+# TODO create expressions with no tRNA
 #import the desired read counts
-read_counts <- read.delim("../sRNA_counts/small_sa_og_norRNA_25_33_counts.txt", sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
+read.counts <- read.csv(file = "../sRNA_counts/small_sa_og_norRNA_25_33_counts.txt", 
+                        stringsAsFactors=FALSE,
+                        row.names = 1)[,]
 
 #remove non used reads
-rRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt", header = FALSE, stringsAsFactors = FALSE)
-read_counts <- read_counts[!(rownames(read_counts) %in% rRNA$V1),]
-YRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_YRNA.txt", header = FALSE, stringsAsFactors = FALSE)
-read_counts <- read_counts[!(rownames(read_counts) %in% YRNA$V1),]
+rRNA <- read.table(file = "../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt",
+                   header = FALSE, 
+                   stringsAsFactors = FALSE)
+
+read.counts <- read.counts[!(rownames(read.counts) %in% rRNA$V1),]
+YRNA <- read.table(file = "../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_YRNA.txt", 
+                   header = FALSE, 
+                   stringsAsFactors = FALSE)
+read.counts <- read.counts[!(rownames(read.counts) %in% YRNA$V1),]
 
 #keep only cell lines from experiment
-read_counts <- read_counts[,4:19]
+read.counts <- read.counts[,4:19]
 #switch the cell lines
-read_counts <- read_counts[,c(9:16, 1:8)]
+read.counts <- read.counts[,c(9:16, 1:8)]
 
-read_counts <- read_counts[,-c(3,11)]
+read.counts <- read.counts[,-c(3,11)]
 
-read_counts <- read_counts[!rowSums(read_counts) == 0,]
+read.counts <- read.counts[!rowSums(read.counts) == 0,]
 
-#read_counts <- removeRepeats(read_counts)
+#read.counts <- removeRepeats(read.counts)
 #remove low counts for differential expression
-read_counts <- read_counts[rowSums(cpm(read_counts) >= 1) >= 7,]
-read_counts <- read_counts[!rowSums(read_counts) == 0,]
+read.counts <- read.counts[rowSums(cpm(read.counts) >= 1) >= 7,]
+read.counts <- read.counts[!rowSums(read.counts) == 0,]
 
 
 
@@ -215,30 +80,45 @@ cellline <- factor(c(1:7, 1:7), levels = 1:7)
 design <-model.matrix(~cellline + celltype)
 
 #converting to DGEList and keeping only expressions significantly above 0
-dge_counts <- DGEList(counts=read_counts)
-#dge_counts <- dge_counts[rowSums(cpm(dge_counts) >=1) >=7,]
-dge_counts <- calcNormFactors(dge_counts, method = c("TMM"))
+dge.counts <- 
+  read.counts  %>% 
+  DGEList() %>%
+  calcNormFactors(method = c('TMM'))
+#dge.counts <- dge.counts[rowSums(cpm(dge.counts) >=1) >=7,]
 
 #voom normalization
-voom_counts <- cpm(dge_counts,log=TRUE, prior.count = 3)
+voom.counts <- cpm(x = dge.counts,
+                   log = TRUE, 
+                   prior.count = 3)
 #MDSplot
-plotMDS(dge_counts, labels = colnames(read_counts), cex = 1, main = "MDS Plot for piRNA Expressions", dim.plot = c(1,2))
+plotMDS(dge.counts, labels = colnames(read.counts), cex = 1, main = "MDS Plot for piRNA Expressions", dim.plot = c(1,2))
 
 #create the linear fit for the counts
-fit <- eBayes(lmFit(voom_counts,design), trend = TRUE)
+fit <-
+  voom.counts %>% 
+  lmFit(design = design) %>%
+  eBayes(trend = TRUE)
 
 
 #voom fold changesmiRNA_alignments
-voom_sRNA <- topTable(fit, coef = "celltypeS", sort.by="logFC", number =nrow(voom_counts) )
-voom_top <- topTable(fit,coef = "celltypeS", sort.by="logFC", number =nrow(voom_counts),lfc = 0,p.value = 0.05)
+voom.sRNA <- topTable(fit = fit, 
+                      coef = "celltypeS", 
+                      sort.by ="logFC", 
+                      number = nrow(voom.counts) )
+voom.top <- topTable(fit = fit,
+                     coef = "celltypeS", 
+                     sort.by ="logFC", 
+                     number = nrow(voom.counts),
+                     lfc = 0,
+                     p.value = 0.05)
 #voomNormExp <- voomCounts$E
-#rm(celltype);rm(design.array); rm(design); rm(dge_counts)
+#rm(celltype);rm(design.array); rm(design); rm(dge.counts)
 #my name function
 
 #adding the reads names into its own column for merging
-voom_sRNA$sRNA <- rownames(voom_sRNA)
-voom_top_sRNA <- voom_top
-voom_top_sRNA$sRNA <- rownames(voom_top_sRNA)
+voom.sRNA$sRNA <- rownames(voom.sRNA)
+voom.top.sRNA <- voom.top
+voom.top.sRNA$sRNA <- rownames(voom.top.sRNA)
 
 #voom_top_sRNA$sRNA <- strtrim(voom_top_sRNA$sRNA, 25)
 #write.table("../fastx_files/DE_piRNA_list.txt",x =  voom_top_sRNA$sRNA, quote = F,row.names = F, col.names = F)
@@ -249,17 +129,36 @@ voom_top_sRNA$sRNA <- rownames(voom_top_sRNA)
 
 
 ```{r piRNA_information_addition}
-
+# TODO add info for counts too
 #tRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_tRNA.txt", header = FALSE, stringsAsFactors = FALSE)
-lncRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_lncRNA.txt", header = FALSE, stringsAsFactors = FALSE)
-unique <- read.table("../alignments/small_sa_og_norRNA_alignments_uniquemapping_list.txt", header = FALSE, stringsAsFactors = FALSE)
-piRBase <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_piRNA.txt", header = FALSE, stringsAsFactors = FALSE)
-piRBaseplus15 <- read.table("../alignments/biogenesis_alignments_norRNA_25_33/small_sa_og_norRNA_25_33_list_alignments_piRNAbaseplus15_list.txt", header = FALSE, stringsAsFactors = FALSE)
-YRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_YRNA.txt", header = FALSE, stringsAsFactors = FALSE)
-snoRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_snoRNA.txt", header = FALSE, stringsAsFactors = FALSE)
-miRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_miRNA.txt", header = FALSE, stringsAsFactors = FALSE, sep = "\t")
-mRNA <- read.table("../alignments/biogenesis_alignments_norRNA_25_33/small_sa_og_norRNA_25_33_list_alignments_cDNA_list.txt", header = FALSE, stringsAsFactors = FALSE)
-rmsk <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_repeatmasker.txt", header = FALSE, stringsAsFactors = FALSE, sep = "\t")
+lncRNA <- read.table(file = "../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_lncRNA.txt",
+                     header = FALSE, 
+                     stringsAsFactors = FALSE)
+unique <- read.table(file = "../alignments/small_sa_og_norRNA_alignments_uniquemapping_list.txt", 
+                     header = FALSE, 
+                     stringsAsFactors = FALSE)
+piRBase <- read.table(file = "../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_piRNA.txt", 
+                      header = FALSE, 
+                      stringsAsFactors = FALSE)
+piRBaseplus15 <- read.table(file = "../alignments/biogenesis_alignments_norRNA_25_33/small_sa_og_norRNA_25_33_list_alignments_piRNAbaseplus15_list.txt",
+                            header = FALSE,
+                            stringsAsFactors = FALSE)
+YRNA <- read.table(file = "../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_YRNA.txt", 
+                   header = FALSE, 
+                   stringsAsFactors = FALSE)
+snoRNA <- read.table(fle = "../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_snoRNA.txt",
+                     header = FALSE, 
+                     stringsAsFactors = FALSE)
+miRNA <- read.table(file = "../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_miRNA.txt",
+                    header = FALSE, 
+                    stringsAsFactors = FALSE, sep = "\t")
+mRNA <- read.table(file = "../alignments/biogenesis_alignments_norRNA_25_33/small_sa_og_norRNA_25_33_list_alignments_cDNA_list.txt",
+                   header = FALSE, 
+                   stringsAsFactors = FALSE)
+rmsk <- read.table(file = "../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_repeatmasker.txt", 
+                   header = FALSE, 
+                   stringsAsFactors = FALSE,
+                   sep = "\t")
 colnames(rmsk) <- c("sRNA", "Repeat Name")
 rmsk$`Repeat Name` <- gsub(pattern = "_", replacement = "", rmsk$`Repeat Name`)
 rmsk_plus40 <- read.table("../alignments/small_sa_og_norRNA_alignments_repeatmasker_plus40.txt", header = FALSE, stringsAsFactors = FALSE)
@@ -270,30 +169,30 @@ tRNA_plus40 <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_
 colnames(tRNA_plus40) <- c("sRNA", "Extended tRNA Name")
 
 
-voom_top_sRNA$'Targeting Sequence' <- strtrim(voom_top_sRNA$sRNA,25)
-voom_top_sRNA$'Targeting Sequence Minus 1st 5`' <- substring(voom_top_sRNA$'Targeting Sequence',2)
-voom_top_sRNA$piRBase <- ifelse(voom_top_sRNA$sRNA %in% piRBase$V1, T, F)
-voom_top_sRNA$'Extended piRBase' <- ifelse(voom_top_sRNA$sRNA %in% piRBaseplus15$V1, T, F)
-voom_top_sRNA$'Unique Mapping' <- ifelse(voom_top_sRNA$sRNA %in% unique$V1, T, F)
-voom_top_sRNA$miRNA <- ifelse(voom_top_sRNA$sRNA %in% miRNA$V1, T, F)
-voom_top_sRNA$mRNA <- ifelse(voom_top_sRNA$sRNA %in% mRNA$V1, T, F)
-voom_top_sRNA$lncRNA <- ifelse(voom_top_sRNA$sRNA %in% lncRNA$V1, T, F)
-voom_top_sRNA$snoRNA <- ifelse(voom_top_sRNA$sRNA %in% snoRNA$V1, T, F)
-voom_top_sRNA$YRNA <- ifelse(voom_top_sRNA$sRNA %in% YRNA$V1, T, F)
-voom_top_sRNA$tRNA <- ifelse(voom_top_sRNA$sRNA %in% tRNA$'sRNA', T, F)
-voom_top_sRNA <- merge(voom_top_sRNA, tRNA[,c(1:2)], by = 'sRNA', all.x = T)
-voom_top_sRNA$'Extended tRNA' <- ifelse(voom_top_sRNA$sRNA %in% tRNA_plus40$'sRNA', T, F)
-voom_top_sRNA <- merge(voom_top_sRNA, tRNA_plus40[,c(1:2)], by = 'sRNA', all.x = T)
-voom_top_sRNA$'Repeat Masker' <- ifelse(voom_top_sRNA$sRNA %in% rmsk$sRNA, T, F)
-voom_top_sRNA <- merge(voom_top_sRNA, rmsk[,c(1:2)], by = 'sRNA', all.x = T)
-voom_top_sRNA$'Extended Repeat Masker' <- ifelse(voom_top_sRNA$sRNA %in% rmsk_plus40$V1, T, F)
+voom.top.sRNA$'Targeting Sequence' <- strtrim(voom.top.sRNA$sRNA,25)
+voom.top.sRNA$'Targeting Sequence Minus 1st 5`' <- substring(voom.top.sRNA$'Targeting Sequence',2)
+voom.top.sRNA$piRBase <- ifelse(voom.top.sRNA$sRNA %in% piRBase$V1, T, F)
+voom.top.sRNA$'Extended piRBase' <- ifelse(voom.top.sRNA$sRNA %in% piRBaseplus15$V1, T, F)
+voom.top.sRNA$'Unique Mapping' <- ifelse(voom.top.sRNA$sRNA %in% unique$V1, T, F)
+voom.top.sRNA$miRNA <- ifelse(voom.top.sRNA$sRNA %in% miRNA$V1, T, F)
+voom.top.sRNA$mRNA <- ifelse(voom.top.sRNA$sRNA %in% mRNA$V1, T, F)
+voom.top.sRNA$lncRNA <- ifelse(voom.top.sRNA$sRNA %in% lncRNA$V1, T, F)
+voom.top.sRNA$snoRNA <- ifelse(voom.top.sRNA$sRNA %in% snoRNA$V1, T, F)
+voom.top.sRNA$YRNA <- ifelse(voom.top.sRNA$sRNA %in% YRNA$V1, T, F)
+voom.top.sRNA$tRNA <- ifelse(voom.top.sRNA$sRNA %in% tRNA$'sRNA', T, F)
+voom.top.sRNA <- merge(voom.top.sRNA, tRNA[,c(1:2)], by = 'sRNA', all.x = T)
+voom.top.sRNA$'Extended tRNA' <- ifelse(voom.top.sRNA$sRNA %in% tRNA_plus40$'sRNA', T, F)
+voom.top.sRNA <- merge(voom.top.sRNA, tRNA_plus40[,c(1:2)], by = 'sRNA', all.x = T)
+voom.top.sRNA$'Repeat Masker' <- ifelse(voom.top.sRNA$sRNA %in% rmsk$sRNA, T, F)
+voom.top.sRNA <- merge(voom.top.sRNA, rmsk[,c(1:2)], by = 'sRNA', all.x = T)
+voom.top.sRNA$'Extended Repeat Masker' <- ifelse(voom.top.sRNA$sRNA %in% rmsk_plus40$V1, T, F)
 
 
-write.table(voom_top_sRNA, "../data/differential_expression//GSC_vs_nonGSC_top_pval<05_differentially_expressed_putative_piRNA.csv", sep = ",", row.names = F, quote = F)
+write.table(voom.top.sRNA, "../data/differential_expression//GSC_vs_nonGSC_top_pval<05_differentially_expressed_putative_piRNA.csv", sep = ",", row.names = F, quote = F)
 
-GSC_read_counts <- read_counts[rownames(read_counts) %in% voom_top_sRNA$sRNA[voom_top_sRNA$logFC > 0],]
+GSC_read_counts <- read_counts[rownames(read_counts) %in% voom.top.sRNA$sRNA[voom.top.sRNA$logFC > 0],]
 GSC_read_counts$sRNA <- rownames(GSC_read_counts)
-nonGSC_read_counts <- read_counts[rownames(read_counts) %in% voom_top_sRNA$sRNA[voom_top_sRNA$logFC < 0],]
+nonGSC_read_counts <- read_counts[rownames(read_counts) %in% voom.top.sRNA$sRNA[voom.top.sRNA$logFC < 0],]
 nonGSC_read_counts$sRNA <- rownames(nonGSC_read_counts)
 
 write.table(GSC_read_counts, "../data/GSC_upregulated_pval<05_putative_piRNA.csv", sep = ",", row.names = F, quote = F,col.names = T)
@@ -302,50 +201,50 @@ write.table(nonGSC_read_counts, "../data/nonGSC_upregulated_pval<05_putative_piR
 #annotating all reads
 
 
-voom_sRNA$'Targeting Sequence' <- strtrim(voom_sRNA$sRNA,25)
-voom_sRNA$'Targeting Sequence Minus 1st 5`' <- substring(voom_sRNA$'Targeting Sequence',2)
-voom_sRNA$piRBase <- ifelse(voom_sRNA$sRNA %in% piRBase$V1, T, F)
-voom_sRNA$'Extended piRBase' <- ifelse(voom_sRNA$sRNA %in% piRBaseplus15$V1, T, F)
-voom_sRNA$'Unique Mapping' <- ifelse(voom_sRNA$sRNA %in% unique$V1, T, F)
-voom_sRNA$miRNA <- ifelse(voom_sRNA$sRNA %in% miRNA$V1, T, F)
-voom_sRNA$mRNA <- ifelse(voom_sRNA$sRNA %in% mRNA$V1, T, F)
-voom_sRNA$lncRNA <- ifelse(voom_sRNA$sRNA %in% lncRNA$V1, T, F)
-voom_sRNA$snoRNA <- ifelse(voom_sRNA$sRNA %in% snoRNA$V1, T, F)
-voom_sRNA$YRNA <- ifelse(voom_sRNA$sRNA %in% YRNA$V1, T, F)
-voom_sRNA$tRNA <- ifelse(voom_sRNA$sRNA %in% tRNA$'sRNA', T, F)
-voom_sRNA <- merge(voom_sRNA, tRNA[,c(1:2)], by = 'sRNA', all.x = T)
-voom_sRNA$'Extended tRNA' <- ifelse(voom_sRNA$sRNA %in% tRNA_plus40$'sRNA', T, F)
-voom_sRNA <- merge(voom_sRNA, tRNA_plus40[,c(1:2)], by = 'sRNA', all.x = T)
-voom_sRNA$'Repeat Masker' <- ifelse(voom_sRNA$sRNA %in% rmsk$sRNA, T, F)
-voom_sRNA <- merge(voom_sRNA, rmsk[,c(1:2)], by = 'sRNA', all.x = T)
-voom_sRNA$'Extended Repeat Masker' <- ifelse(voom_sRNA$sRNA %in% rmsk_plus40$V1, T, F)
+voom.sRNA$'Targeting Sequence' <- strtrim(voom.sRNA$sRNA,25)
+voom.sRNA$'Targeting Sequence Minus 1st 5`' <- substring(voom.sRNA$'Targeting Sequence',2)
+voom.sRNA$piRBase <- ifelse(voom.sRNA$sRNA %in% piRBase$V1, T, F)
+voom.sRNA$'Extended piRBase' <- ifelse(voom.sRNA$sRNA %in% piRBaseplus15$V1, T, F)
+voom.sRNA$'Unique Mapping' <- ifelse(voom.sRNA$sRNA %in% unique$V1, T, F)
+voom.sRNA$miRNA <- ifelse(voom.sRNA$sRNA %in% miRNA$V1, T, F)
+voom.sRNA$mRNA <- ifelse(voom.sRNA$sRNA %in% mRNA$V1, T, F)
+voom.sRNA$lncRNA <- ifelse(voom.sRNA$sRNA %in% lncRNA$V1, T, F)
+voom.sRNA$snoRNA <- ifelse(voom.sRNA$sRNA %in% snoRNA$V1, T, F)
+voom.sRNA$YRNA <- ifelse(voom.sRNA$sRNA %in% YRNA$V1, T, F)
+voom.sRNA$tRNA <- ifelse(voom.sRNA$sRNA %in% tRNA$'sRNA', T, F)
+voom.sRNA <- merge(voom.sRNA, tRNA[,c(1:2)], by = 'sRNA', all.x = T)
+voom.sRNA$'Extended tRNA' <- ifelse(voom.sRNA$sRNA %in% tRNA_plus40$'sRNA', T, F)
+voom.sRNA <- merge(voom.sRNA, tRNA_plus40[,c(1:2)], by = 'sRNA', all.x = T)
+voom.sRNA$'Repeat Masker' <- ifelse(voom.sRNA$sRNA %in% rmsk$sRNA, T, F)
+voom.sRNA <- merge(voom.sRNA, rmsk[,c(1:2)], by = 'sRNA', all.x = T)
+voom.sRNA$'Extended Repeat Masker' <- ifelse(voom.sRNA$sRNA %in% rmsk_plus40$V1, T, F)
 
 
-write.table(voom_sRNA, "../data/differential_expression/GSC_vs_nonGSC_all_differentially_expressed_putative_piRNA.csv", sep = ",", row.names = F, quote = F)
+write.table(voom.sRNA, "../data/differential_expression/GSC_vs_nonGSC_all_differentially_expressed_putative_piRNA.csv", sep = ",", row.names = F, quote = F)
 
 
 #tRNA derived piRNA
-write.table(voom_top_sRNA$sRNA[voom_top_sRNA$tRNA], "../data/meme_files/DE_tRNA_piRNA.txt", quote=F, row.names = F, col.names = F)
+write.table(voom.top.sRNA$sRNA[voom.top.sRNA$tRNA], "../data/meme_files/DE_tRNA_piRNA.txt", quote=F, row.names = F, col.names = F)
 write.table(createpiRNAFasta("../data/meme_files/DE_tRNA_piRNA.txt"), "../data/meme_files/DE_tRNA_piRNA.fa", quote= F, row.names = F, col.names = F, sep = "\t")
 writeXStringSet(trimFastaTo("../data/meme_files/DE_tRNA_piRNA.fa", 1, 10), "../data/meme_files/DE_tRNA_piRNA_10bp.fa" )
 
-write.table(voom_top_sRNA$sRNA[voom_top_sRNA$mRNA], "../data/meme_files/DE_mRNA_piRNA.txt", quote=F, row.names = F, col.names = F)
+write.table(voom.top.sRNA$sRNA[voom.top.sRNA$mRNA], "../data/meme_files/DE_mRNA_piRNA.txt", quote=F, row.names = F, col.names = F)
 write.table(createpiRNAFasta("../data/meme_files/DE_mRNA_piRNA.txt"), "../data/meme_files/DE_mRNA_piRNA.fa", quote= F, row.names = F, col.names = F, sep = "\t")
 writeXStringSet(trimFastaTo("../data/meme_files/DE_mRNA_piRNA.fa", 1, 10), "../data/meme_files/DE_mRNA_piRNA_10bp.fa" )
 
 #unique derived piRNA
-write.table(voom_top_sRNA$sRNA[voom_top_sRNA$unique_mapping], "../data/meme_files/DE_UM_piRNA.txt", quote=F, row.names = F, col.names = F)
+write.table(voom.top.sRNA$sRNA[voom.top.sRNA$unique_mapping], "../data/meme_files/DE_UM_piRNA.txt", quote=F, row.names = F, col.names = F)
 write.table(createpiRNAFasta("../data/meme_files/DE_UM_piRNA.txt"), "../data/meme_files/DE_UM_piRNA.fa", quote= F, row.names = F, col.names = F, sep = "\t")
 writeXStringSet(trimFastaTo("../data/meme_files/DE_UM_piRNA.fa", 1, 10), "../data/meme_files/DE_UM_piRNA_10bp.fa" )
 
 #repeat derived piRNA
-write.table(voom_top_sRNA$sRNA[voom_top_sRNA$unique_mapping == FALSE], "../data/meme_files/DE_RD_piRNA.txt", quote=F, row.names = F, col.names = F)
+write.table(voom.top.sRNA$sRNA[voom.top.sRNA$unique_mapping == FALSE], "../data/meme_files/DE_RD_piRNA.txt", quote=F, row.names = F, col.names = F)
 write.table(createpiRNAFasta("../data/meme_files/DE_RD_piRNA.txt"), "../data/meme_files/DE_RD_piRNA.fa", quote= F, row.names = F, col.names = F, sep = "\t")
 writeXStringSet(trimFastaTo("../data/meme_files/DE_RD_piRNA.fa", 1, 10), "../data/meme_files/DE_RD_piRNA_10bp.fa" )
 
 
 #repeatmasker derived piRNA
-write.table(voom_top_sRNA$sRNA[voom_top_sRNA$rmsk == T & voom_top_sRNA$tRNA == F], "../data/meme_files/DE_rmsk_notRNA_piRNA.txt", quote=F, row.names = F, col.names = F)
+write.table(voom.top.sRNA$sRNA[voom.top.sRNA$rmsk == T & voom.top.sRNA$tRNA == F], "../data/meme_files/DE_rmsk_notRNA_piRNA.txt", quote=F, row.names = F, col.names = F)
 write.table(createpiRNAFasta("../data/meme_files/DE_rmsk_notRNA_piRNA.txt"), "../data/meme_files/DE_rmsk_notRNA_piRNA.fa", quote= F, row.names = F, col.names = F, sep = "\t")
 writeXStringSet(trimFastaTo("../data/meme_files/DE_rmsk_notRNA_piRNA.fa", 1, 10), "../data/meme_files/DE_rmsk_notRNA_piRNA_10bp.fa" )
 
@@ -359,67 +258,97 @@ writeXStringSet(trimFastaTo("../data/meme_files/DE_rmsk_notRNA_piRNA.fa", 1, 10)
 ```{r miRNA_import_reads, echo = FALSE}
 
 #import the desired read counts
-read_counts <- read.delim("../sRNA_counts/small_sa_og_norRNA_noncRNA_18_24_counts.txt", sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
+read.counts <- read.csv(file = "../sRNA_counts/small_sa_og_norRNA_noncRNA_18_24_counts.txt", 
+                        stringsAsFactors=FALSE,
+                        row.names = 1)[,]
 #select only the cell lines used in the experiment
-rRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt", header = FALSE, stringsAsFactors = FALSE)
-read_counts <- read_counts[!(rownames(read_counts) %in% rRNA$V1),]
+rRNA <- read.table(file = "../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt", 
+                   header = FALSE,
+                   stringsAsFactors = FALSE)
+read.counts <- read.counts[!(rownames(read.counts) %in% rRNA$V1),]
 
 
-tRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_repeatmasker_tRNA.txt", header = FALSE, stringsAsFactors = FALSE)
-lncRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_lncRNA.txt", header = FALSE, stringsAsFactors = FALSE)
-unique <- read.table("../alignments/small_sa_og_norRNA_alignments_uniquemapping_list.txt", header = FALSE, stringsAsFactors = FALSE)
-piRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_piRNA.txt", header = FALSE, stringsAsFactors = FALSE)
-YRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_YRNA.txt", header = FALSE, stringsAsFactors = FALSE)
-snoRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_snoRNA.txt", header = FALSE, stringsAsFactors = FALSE)
-rmsk <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_repeatmasker.txt", header = FALSE, stringsAsFactors = FALSE)
+tRNA <- read.table(file = "../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_repeatmasker_tRNA.txt",
+                   header = FALSE,
+                   stringsAsFactors = FALSE)
+lncRNA <- read.table(file = "../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_lncRNA.txt", 
+                     header = FALSE, 
+                     stringsAsFactors = FALSE)
+unique <- read.table(file = "../alignments/small_sa_og_norRNA_alignments_uniquemapping_list.txt", 
+                     header = FALSE,
+                     stringsAsFactors = FALSE)
+piRNA <- read.table(file = "../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_piRNA.txt",
+                    header = FALSE,
+                    stringsAsFactors = FALSE)
+YRNA <- read.table(file = "../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_YRNA.txt",
+                   header = FALSE, 
+                   stringsAsFactors = FALSE)
+snoRNA <- read.table(file = "../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_snoRNA.txt",
+                     header = FALSE, 
+                     stringsAsFactors = FALSE)
+rmsk <- read.table(file = "../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_repeatmasker.txt", 
+                   header = FALSE, 
+                   stringsAsFactors = FALSE)
 
-read_counts <- read_counts[!(rownames(read_counts) %in% tRNA$V1),]
-read_counts <- read_counts[!(rownames(read_counts) %in% lncRNA$V1),]
-read_counts <- read_counts[!(rownames(read_counts) %in% YRNA$V1),]
-read_counts <- read_counts[!(rownames(read_counts) %in% snoRNA$V1),]
-read_counts <- read_counts[!(rownames(read_counts) %in% rmsk$V1),]
+read.counts <- read.counts[!(rownames(read.counts) %in% tRNA$V1),]
+read.counts <- read.counts[!(rownames(read.counts) %in% lncRNA$V1),]
+read.counts <- read.counts[!(rownames(read.counts) %in% YRNA$V1),]
+read.counts <- read.counts[!(rownames(read.counts) %in% snoRNA$V1),]
+read.counts <- read.counts[!(rownames(read.counts) %in% rmsk$V1),]
 
-mycoplasm <- read.table("../alignments/miRNA/small_sa_og_norRNA_noncRNA_18_24_alignments_mhyorhinisdna.txt", header = FALSE, stringsAsFactors = FALSE)
+mycoplasm <- read.table(file = "../alignments/miRNA/small_sa_og_norRNA_noncRNA_18_24_alignments_mhyorhinisdna.txt",
+                        header = FALSE, 
+                        stringsAsFactors = FALSE)
 
-read_counts <- read_counts[!(rownames(read_counts) %in% mycoplasm$V1),]
+read.counts <- read.counts[!(rownames(read.counts) %in% mycoplasm$V1),]
 
 
-miRNA <- read.table("../alignments/small_sa_og_norRNA_list_alignments_miRNA.txt", header = FALSE, stringsAsFactors = FALSE, sep = "\t")
+miRNA <- read.table(file = "../alignments/small_sa_og_norRNA_list_alignments_miRNA.txt", 
+                    header = FALSE, 
+                    stringsAsFactors = FALSE, 
+                    sep = "\t")
 #miRNA$sequence <- sapply(miRNA$V1, FUN = strsplit, split = "\t")
 #miRNA$miRNA <- unlist(sapply(miRNA$V1, FUN = strsplit, split = "\t"))[2]
 
-read_counts <- read_counts[,4:19]
+read.counts <- read.counts[,4:19]
 #switch the cell lines to the correct locations, control vs treatment
-read_counts <- read_counts[,c(9:16, 1:8)]
+read.counts <- read.counts[,c(9:16, 1:8)]
 #remove the low count cell lines
-read_counts <- read_counts[,-c(3,11)]
+read.counts <- read.counts[,-c(3,11)]
 #remove low count reads
-read_counts <- read_counts[rowSums(cpm(read_counts) >1) >= 6,]
+read.counts <- read.counts[rowSums(cpm(read.counts) >1) >= 6,]
 
 
 
 
-read_counts$sRNA <- rownames(read_counts)
-read_counts$sRNA <- strtrim(read_counts$sRNA, 21)
-read_counts <- merge(read_counts, miRNA, by.x = "sRNA", by.y = "V1", all.x = T)
+read.counts$sRNA <- rownames(read.counts)
+read.counts$sRNA <- strtrim(read.counts$sRNA, 21)
+read.counts <- merge(read.counts, 
+                     miRNA, 
+                     by.x = "sRNA",
+                     by.y = "V1",
+                     all.x = T)
 
-putmiRNA <- function(n){
-  if(is.na(read_counts$V2[n]) == F){
-    return(read_counts$V2[n])
+putmiRNA <- 
+  function(n){
+    if(is.na(read.counts$V2[n]) == F){
+      return(read.counts$V2[n])
+    }
+    else{
+      return(read.counts$sRNA[n])
+    }
   }
-  else{
-    return(read_counts$sRNA[n])
-  }
-}
-read_counts$sRNA <- sapply(X = 1:nrow(read_counts), FUN = putmiRNA)
+read.counts$sRNA <- sapply(X = 1:nrow(read.counts), 
+                           FUN = putmiRNA)
 
+# TODO clean this up
 
-read_counts <- subset(read_counts, select = -V2)
+read.counts <- subset(read.counts, select = -V2)
 
-read_counts <- aggregate(data = read_counts,.~sRNA, sum)
+read.counts <- aggregate(data = read.counts,.~sRNA, sum)
 
-rownames(read_counts) <- read_counts$sRNA
-read_counts <- subset(read_counts, select = -sRNA)
+rownames(read.counts) <- read.counts$sRNA
+read.counts <- subset(read.counts, select = -sRNA)
 
 
 ```
@@ -440,36 +369,41 @@ cellline <- factor(c(1:7, 1:7), levels = 1:7)
 design <-model.matrix(~cellline + celltype)
 
 #converting to DGEList and keeping only expressions significantly above 0
-dge_counts <- DGEList(counts=read_counts)
-#dge_counts <- dge_counts[rowSums(cpm(dge_counts) >=1) >=7,]
-dge_counts <- calcNormFactors(dge_counts, method = c("TMM"))
-
+dge.counts <- 
+  read.counts %>% 
+  DGEList() %>%
+  calcNormFactors(method = c("TMM"))
 #voom normalization
-voom_counts <- cpm(dge_counts,log=TRUE, prior.count = 3)
+voom.counts <- cpm(x = dge.counts,
+                   log=TRUE, 
+                   prior.count = 3)
 #MDSplot
-#plotMDS(dge_counts, labels = colnames(read_counts), cex = 1, main = "MDS Plot for piRNA Expressions", dim.plot = c(1,2))
+#plotMDS(dge.counts, labels = colnames(read.counts), cex = 1, main = "MDS Plot for piRNA Expressions", dim.plot = c(1,2))
 
 #create the linear fit for the counts
-fit <- eBayes(lmFit(voom_counts,design), trend = TRUE)
+fit <-
+  voom.counts %>%
+  lmFit(design) %>%
+  eBayes(trend = TRUE)
 
 
 #voom fold changesmiRNA_alignments
-voom_sRNA <- topTable(fit, coef = "celltypeS", sort.by="logFC", number =nrow(voom_counts) )
-voom_top <- topTable(fit,coef = "celltypeS", sort.by="logFC", number =nrow(voom_counts),lfc = 0,p.value = 0.05)
+voom.sRNA <- topTable(fit, coef = "celltypeS", sort.by="logFC", number =nrow(voom.counts) )
+voom.top <- topTable(fit,coef = "celltypeS", sort.by="logFC", number =nrow(voom.counts),lfc = 0,p.value = 0.05)
 #voomNormExp <- voomCounts$E
-#rm(celltype);rm(design.array); rm(design); rm(dge_counts)
+#rm(celltype);rm(design.array); rm(design); rm(dge.counts)
 #my name function
 
 #adding the reads names into its own column for merging
-voom_sRNA$sRNA <- rownames(voom_sRNA)
-voom_top_sRNA <- voom_top
-voom_top_sRNA$sRNA <- rownames(voom_top_sRNA)
+voom.sRNA$sRNA <- rownames(voom.sRNA)
+voom.top.sRNA <- voom.top
+voom.top.sRNA$sRNA <- rownames(voom.top.sRNA)
 
-write.table(voom_sRNA, "../data/GSC_vs_nonGSC_miRNA_differential_expression//GSC_vs_nonGSC_all_differentially_expressed_miRNA.csv", sep = ",", row.names = F, quote = F)
-write.table(voom_top_sRNA, "../data/GSC_vs_nonGSC_miRNA_differential_expression/GSC_vs_nonGSC_top_pval<05_differentially_expressed_miRNA.csv", sep = ",", row.names = F, quote = F)
+write.table(voom.sRNA, "../data/GSC_vs_nonGSC_miRNA_differential_expression//GSC_vs_nonGSC_all_differentially_expressed_miRNA.csv", sep = ",", row.names = F, quote = F)
+write.table(voom.top.sRNA, "../data/GSC_vs_nonGSC_miRNA_differential_expression/GSC_vs_nonGSC_top_pval<05_differentially_expressed_miRNA.csv", sep = ",", row.names = F, quote = F)
 
-#voom_top_sRNA$sRNA <- rownames(voom_top_sRNA)
-#voom_top_sRNA <- merge(voom_sRNA, miRNA, by.x = "sRNA", by.y = "V1", all.x = T)
+#voom.top.sRNA$sRNA <- rownames(voom.top.sRNA)
+#voom.top.sRNA <- merge(voom.sRNA, miRNA, by.x = "sRNA", by.y = "V1", all.x = T)
 ```
 
 
@@ -483,31 +417,31 @@ write.table(voom_top_sRNA, "../data/GSC_vs_nonGSC_miRNA_differential_expression/
 ```{r targeting_reads, echo = FALSE}
 
 #import the desired read counts
-read_counts <- read.delim("../sRNA_counts/small_sa_og_norRNA_25_33_counts.txt", sep=",", stringsAsFactors=FALSE, row.names = 1)
+read.counts <- read.delim("../sRNA_counts/small_sa_og_norRNA_25_33_counts.txt", sep=",", stringsAsFactors=FALSE, row.names = 1)
 
 rRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt", header = FALSE, stringsAsFactors = FALSE)
-read_counts <- read_counts[!(rownames(read_counts) %in% rRNA$V1),]
+read.counts <- read.counts[!(rownames(read.counts) %in% rRNA$V1),]
 YRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_YRNA.txt", header = FALSE, stringsAsFactors = FALSE)
-read_counts <- read_counts[!(rownames(read_counts) %in% YRNA$V1),]
-read_counts <- removeRepeats(read_counts)
+read.counts <- read.counts[!(rownames(read.counts) %in% YRNA$V1),]
+read.counts <- removeRepeats(read.counts)
 
 
-read_counts <- read_counts[,4:19]
+read.counts <- read.counts[,4:19]
 #sort the samples so
-read_counts <- read_counts[,c(9:16, 1:8)]
+read.counts <- read.counts[,c(9:16, 1:8)]
 
-read_counts <- read_counts[,-c(3,11)]
+read.counts <- read.counts[,-c(3,11)]
 
 
-#read_counts <- read_counts[nchar(rownames(read_counts)) >= 28,]
+#read.counts <- read.counts[nchar(rownames(read.counts)) >= 28,]
 
-read_counts <- read_counts[rowSums(cpm(read_counts) > 1) >= 7,]
+read.counts <- read.counts[rowSums(cpm(read.counts) > 1) >= 7,]
 
 #shorten the reads to just the predicted targeting sequence
-read_counts$short <- strtrim(rownames(read_counts),25)
-read_counts <- aggregate(. ~ short, data = read_counts, FUN = sum, na.rm = TRUE)
-rownames(read_counts) <- read_counts$short
-read_counts <- subset(read_counts, select = -short)
+read.counts$short <- strtrim(rownames(read.counts),25)
+read.counts <- aggregate(. ~ short, data = read.counts, FUN = sum, na.rm = TRUE)
+rownames(read.counts) <- read.counts$short
+read.counts <- subset(read.counts, select = -short)
 
 
 
@@ -522,31 +456,51 @@ cellline <- factor(c(1:7, 1:7), levels = 1:7)
 design <-model.matrix(~cellline + celltype)
 
 #converting to DGEList and keeping only expressions significantly above 0
-dge_counts <- DGEList(counts=read_counts)
-#dge_counts <- dge_counts[rowSums(cpm(dge_counts) >=1) >=7,]
-dge_counts <- calcNormFactors(dge_counts, method = c("TMM"))
+dge.counts <- DGEList(counts=read.counts)
+#dge.counts <- dge.counts[rowSums(cpm(dge.counts) >=1) >=7,]
+dge.counts <- calcNormFactors(dge.counts, method = c("TMM"))
 #voom normalization
-voom_counts <- cpm(dge_counts, log = TRUE, prior.count = 3)
+voom.counts <- cpm(dge.counts, log = TRUE, prior.count = 3)
 
 #MDSplot
-plotMDS(voom_counts, labels = colnames(read_counts), cex = 1, main = "MDS Plot for piRNA Expressions", dim.plot = c(1,2))
+plotMDS(voom.counts, labels = colnames(read.counts), cex = 1, main = "MDS Plot for piRNA Expressions", dim.plot = c(1,2))
 
 #create the linear fit for the data
-fit <- eBayes(lmFit(voom_counts,design), trend = TRUE)
+fit <- 
+  voom.counts %>%
+  lmFit(design) %>%
+  eBayes(trend = TRUE)
 
 #sort fold changes sorted by p-value
-voom_sRNA <- topTable(fit, coef = "celltypeS", sort.by="logFC", number =nrow(voom_counts) )
-voom_top <- topTable(fit,coef = "celltypeS", sort.by="logFC", number =nrow(voom_counts),lfc = 2,p.value = 0.05)
+voom.sRNA <- topTable(fit = fit, 
+                      coef = "celltypeS", 
+                      sort.by="logFC",
+                      number =nrow(voom.counts) )
+voom.top <- topTable(fit = fit,
+                     coef = "celltypeS", 
+                     sort.by="logFC",
+                     number =nrow(voom.counts),
+                     lfc = 2,
+                     p.value = 0.05)
 
 #adding the reads names into its own column for merging
-voom_sRNA$sRNA <- rownames(voom_sRNA)
-voom_top_sRNA <- voom_top
-voom_top_sRNA$sRNA <- rownames(voom_top_sRNA)
+voom.sRNA$sRNA <- rownames(voom.sRNA)
+voom.top.sRNA <- voom.top
+voom.top.sRNA$sRNA <- rownames(voom.top.sRNA)
 
 
-#write.table(rownames(voom_sRNA), "../data/temp_read_names.txt", quote=F, row.names = F, col.names = F)
-write.table(voom_sRNA, "../data/GSC_vs_nonGSC_targeting_sequences_differential_expression/GSC_vs_nonGSC_all_differentially_expressed_targeting_sequences.csv", quote=F, row.names = T, col.names = T, sep = ",")
-write.table(voom_top_sRNA, "../data/GSC_vs_nonGSC_targeting_sequences_differential_expression/GSC_vs_nonGSC_top_pval<05_differentially_expressed_targeting_sequences.csv", quote=F, row.names = T, col.names = T, sep = ",")
+#write.table(rownames(voom.sRNA), "../data/temp_read_names.txt", quote=F, row.names = F, col.names = F)
+write.table(x = voom.sRNA, 
+            file = "../data/GSC_vs_nonGSC_targeting_sequences_differential_expression/GSC_vs_nonGSC_all_differentially_expressed_targeting_sequences.csv",
+            quote=F, 
+            row.names = T, 
+            col.names = T, 
+            sep = ",")
+write.table(x = voom.top.sRNA, file = "../data/GSC_vs_nonGSC_targeting_sequences_differential_expression/GSC_vs_nonGSC_top_pval<05_differentially_expressed_targeting_sequences.csv",
+            quote=F,
+            row.names = T,
+            col.names = T, 
+            sep = ",")
 
 
 ```
@@ -559,15 +513,18 @@ write.table(voom_top_sRNA, "../data/GSC_vs_nonGSC_targeting_sequences_differenti
 ```{r SRA, echo = FALSE}
 
 #import the desired read counts
-read_counts <- read.delim("../sRNA_counts/sra_all_sa_og_norRNA_25_33_read_counts.txt", sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
+read.counts <- read.csv(file = "../sRNA_counts/sra_all_sa_og_norRNA_25_33_read.counts.txt",
+                        stringsAsFactors=FALSE, row.names = 1)[,]
 #filter <- read.table("../fastx_files/sra_all_sa_og_norRNA_list.txt", header = FALSE, stringsAsFactors = FALSE)
-#read_counts <- read_counts[(rownames(read_counts) %in% filter$V1),]
-#read_counts <- read_counts[nchar(rownames(read_counts)) >= 25 & nchar(rownames(read_counts)) <= 33,]
+#read.counts <- read.counts[(rownames(read.counts) %in% filter$V1),]
+#read.counts <- read.counts[nchar(rownames(read.counts)) >= 25 & nchar(rownames(read.counts)) <= 33,]
 
-colnames(read_counts) <- gsub(colnames(read_counts), pattern = "_sa_collapsed.fq", replacement = "")
+colnames(read.counts) <- gsub(colnames(read.counts), 
+                              pattern = "_sa_collapsed.fq", 
+                              replacement = "")
 
-#read_counts <-  read_counts[,-c(26,27,28,29,30)]
-read_counts <- read_counts[,c(26:29)]
+#read.counts <-  read.counts[,-c(26,27,28,29,30)]
+read.counts <- read.counts[,c(26:29)]
 
 filters <- list.files("../alignments/biogenesis_alignments_sra/", full.names = T)
 titles <- c("lncRNA", "miRNA", "piRNAbase", "repeat",  "snoRNA", "tRNA", "Y-RNA")
@@ -575,11 +532,11 @@ titles <- c("lncRNA", "miRNA", "piRNAbase", "repeat",  "snoRNA", "tRNA", "Y-RNA"
 #filters
 
 #create a dataframe of the biogenesis
-df <- as.data.frame(matrix(nrow = ncol(read_counts), ncol = 0, byrow = TRUE))
+df <- as.data.frame(matrix(nrow = ncol(read.counts), ncol = 0, byrow = TRUE))
 
-df$cell_line <- colnames(read_counts)
+df$cell_line <- colnames(read.counts)
 
-df$total_sRNA <- colSums(read_counts)
+df$total_sRNA <- colSums(read.counts)
 
 
 #join all the biogenesis counts together
@@ -587,7 +544,7 @@ for(n in 1:length(filters)){
   
   #import the desired read counts
   filter <- read.table(filters[n], header = FALSE, stringsAsFactors = FALSE, sep = "\t")
-  df[,titles[n]] <- colSums(read_counts[rownames(read_counts) %in% filter$V1,])
+  df[,titles[n]] <- colSums(read.counts[rownames(read.counts) %in% filter$V1,])
   
 
 }
@@ -642,16 +599,16 @@ ggplot(data = temp ) +
 
 
 #import the desired read counts
-read_counts <- read.delim("../sRNA_counts/SRA_clusters_counts.txt", sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
+read.counts <- read.delim("../sRNA_counts/SRA_clusters_counts.txt", sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
 #select only the cell lines used in the experiment
-#read_counts <- read_counts[nchar(rownames(read_counts)) >17,]
+#read.counts <- read.counts[nchar(rownames(read.counts)) >17,]
 
-read_counts <- read_counts[,c(2,3,4,5,6,7,1,8,9,10)]
+read.counts <- read.counts[,c(2,3,4,5,6,7,1,8,9,10)]
 
-colnames(read_counts) <- c( "OA1", "OA2", "O11", "O12", "O21", "O22","T1", "T2", "T3", "T4" )
+colnames(read.counts) <- c( "OA1", "OA2", "O11", "O12", "O21", "O22","T1", "T2", "T3", "T4" )
 
 
-read_counts <- read_counts[nchar(rownames(read_counts)) >= 25 & nchar(rownames(read_counts)) <=33, ]
+read.counts <- read.counts[nchar(rownames(read.counts)) >= 25 & nchar(rownames(read.counts)) <=33, ]
 
 filters <- list.files("../alignments/biogenesis_small_sa_og_norRNA/", full.names = T)
 titles <- c("lncRNA", "miRNA", "piRNAbase", "rRNA",  "snoRNA", "tRNA", "Y-RNA")
@@ -663,7 +620,7 @@ df <- as.data.frame(matrix(nrow = 10, ncol = 0, byrow = TRUE))
 df$cell_line <- c( "OA1", "OA2", "O11", "O12", "O21", "O22","T1", "T2", "T3", "T4" )
 df$cell_type <- factor(c(rep("Ovary", 6), (rep("Testis",4))))
 
-df$total_sRNA <- colSums(read_counts)
+df$total_sRNA <- colSums(read.counts)
 
 
 #join all the biogenesis counts together
@@ -671,7 +628,7 @@ for(n in 1:length(filters)){
   
   #import the desired read counts
   filter <- read.table(filters[n], header = FALSE, stringsAsFactors = FALSE, sep = "\t")
-  df[,titles[n]] <- colSums(read_counts[rownames(read_counts) %in% filter$V1,])
+  df[,titles[n]] <- colSums(read.counts[rownames(read.counts) %in% filter$V1,])
   
 
 }
