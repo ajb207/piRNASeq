@@ -9,7 +9,9 @@ output: html_document
 
 source('global.R')
 
-conversion <- read.csv(file = "../../reference_sets/ensembl_to_hgnc.txt",
+data_directory = '~/MEGA/data_files'
+
+conversion <- read.csv(file = file.path(data_directory, 'conversion_sets/ensembl_to_hgnc.txt'),
                        stringsAsFactors=FALSE)
 options(scipen=999)
 
