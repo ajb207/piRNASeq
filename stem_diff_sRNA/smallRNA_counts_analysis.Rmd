@@ -21,15 +21,15 @@ options(scipen=999)
 
 
 ```{r messing_around}
-read_counts <- read.delim("../sRNA_counts/small_sa_og_norRNA_counts.txt", sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
-rRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+read_counts <- read.delim(file.path(data_directory, "sRNA_counts/small_sa_og_norRNA_counts.txt"), sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
+rRNA <- read.table(file.path(data_directory, "stem_diff_alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt"), header = FALSE, stringsAsFactors = FALSE)
 read_counts <- read_counts[!(rownames(read_counts) %in% rRNA$V1),]
 read_counts <- read_counts[,4:19]
 read_counts <- read_counts[!rowSums(read_counts) == 0,]
 #switch the cell lines
 read_counts <- read_counts[,c(9:16, 1:8)]
 
-tRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_tRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+tRNA <- read.table(file.path(data_directory, "stem_diff_alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_repeatmasker_tRNA.txt"), header = FALSE, stringsAsFactors = FALSE)
 read_counts <- read_counts[(rownames(read_counts) %in% tRNA$V1),]
 
 ```
@@ -48,7 +48,7 @@ Code useful for seeing how many reads survives each pre-processing step.
 ```{r preprocessing_reads, echo = FALSE}
 
 #the filters are what sequences the piRNA align to
-filters <- list.files("../sRNA_counts/preprocessing_read_counts/", full.names = T)
+filters <- list.files(file.path(data_directory, "sRNA_counts/preprocessing_read_counts"), full.names = T)
 filters <- filters[c(1,2,5,3,4)]
 titles <- c( "15-40 nt", "On Genome", "Removed rRNA", "18-24nt", "25-33nt")
 
@@ -122,22 +122,22 @@ ggplot(data = temp) +
 
 ```{r basic_processing}
 
+alignments_directory = file.path(data_directory, 'stem_diff_alignments')
 
 #import the desired read counts
-read_counts <- read.delim("../sRNA_counts/small_sa_og_norRNA_25_33_counts.txt", sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
+read_counts <- read.delim(file.path(data_directory, "sRNA_counts/small_sa_og_norRNA_25_33_counts.txt"), sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
 #rRNA <-read.table("../fastx_files/small_sa_og_rRNA_list.txt", header = FALSE, stringsAsFactors = FALSE)
-piRNA <- read.table("../alignments/biogenesis_alignments_norRNA_25_33/small_sa_og_norRNA_25_33_list_alignments_piRNAbaseplus15_list.txt", header = FALSE, stringsAsFactors = FALSE)
-tRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_tRNA.txt", header = FALSE, stringsAsFactors = FALSE)
-lncRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_lncRNA.txt", header = FALSE, stringsAsFactors = FALSE)
-snoRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_snoRNA.txt", header = FALSE, stringsAsFactors = FALSE)
-mRNA <- read.table("../alignments/biogenesis_alignments_norRNA_25_33/small_sa_og_norRNA_25_33_list_alignments_cDNA_list.txt", header = FALSE, stringsAsFactors = FALSE)
-rmsk <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_repeatmasker.txt", header = FALSE, stringsAsFactors = FALSE)
-YRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_YRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+piRNA <- read.table(file.path(alignments_directory, "biogenesis_alignments_norRNA_25_33/small_sa_og_norRNA_25_33_list_alignments_piRNAbaseplus15_list.txt"), header = FALSE, stringsAsFactors = FALSE)
+tRNA <- read.table(file.path(alignments_directory, "biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_tRNA.txt"), header = FALSE, stringsAsFactors = FALSE)
+lncRNA <- read.table(file.path(alignments_directory, "biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_lncRNA.txt"), header = FALSE, stringsAsFactors = FALSE)
+snoRNA <- read.table(file.path(alignments_directory, "biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_snoRNA.txt"), header = FALSE, stringsAsFactors = FALSE)
+mRNA <- read.table(file.path(alignments_directory, "biogenesis_alignments_norRNA_25_33/small_sa_og_norRNA_25_33_list_alignments_cDNA_list.txt"), header = FALSE, stringsAsFactors = FALSE)
+rmsk <- read.table(file.path(alignments_directory, "biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_repeatmasker.txt"), header = FALSE, stringsAsFactors = FALSE)
+YRNA <- read.table(file.path(alignments_directory, "biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_YRNA.txt"), header = FALSE, stringsAsFactors = FALSE)
+rRNA <- read.table(file.path(alignments_directory, "biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt"), header = FALSE, stringsAsFactors = FALSE)
 
-rRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+
 read_counts <- read_counts[!(rownames(read_counts) %in% rRNA$V1),]
-
-YRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_YRNA.txt", header = FALSE, stringsAsFactors = FALSE)
 read_counts <- read_counts[!(rownames(read_counts) %in% YRNA$V1),]
 
 read_counts <- read_counts[,4:19]
@@ -163,7 +163,7 @@ read_counts <- read_counts[!rowSums(read_counts) == 0,]
 
 
 
-unique <- read.table(file = "../../data_files/stem_diff_alignments//small_sa_og_norRNA_alignments_uniquemapping_list.txt", 
+unique <- read.table(file = file.path(alignments_directory, "small_sa_og_norRNA_alignments_uniquemapping_list.txt"),
                      header = FALSE,
                      stringsAsFactors = FALSE)
 uniquepiRNA <-  read_counts[rownames(read_counts) %in% unique$V1,]
@@ -222,9 +222,9 @@ writeXStringSet(trimFastaTo("../data/meme_files/RD_piRNA.fa", 1, 10), "../data/m
 ```{r smallRNA_only_biogenesis_stats}
 
 
-read_counts <- read.delim("../sRNA_counts/small_sa_og_norRNA_25_33_counts.txt", sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
+read_counts <- read.delim(file.path(data_directory, "sRNA_counts/small_sa_og_norRNA_25_33_counts.txt"), sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
 read_counts <- read_counts[,4:19]
-rRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+rRNA <- read.table(file.path(alignments_directory, "biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt"), header = FALSE, stringsAsFactors = FALSE)
 read_counts <- read_counts[!(rownames(read_counts) %in% rRNA$V1),]
 
 #read_counts
@@ -232,7 +232,7 @@ read_counts <- read_counts[!(rownames(read_counts) %in% rRNA$V1),]
 read_counts <- cpm(read_counts)
 
 #the filters are what sequences the piRNA align to
-filters <- list.files("../alignments/biogenesis_alignments_norRNA_25_33/", full.names = T)
+filters <- list.files(file.path(data_directory, "biogenesis_alignments_norRNA_25_33"), full.names = T)
 titles <- c("Clusters", "3UTR", "mRNA", "lincRNA", "lncRNA", "miRNA", "piRNA\nBase","Extended\npiRNA\nBase" ,"tRNA","Repeat\nElements", "snoRNA", "Y-RNA")
 
 #create a dataframe of the biogenesis
@@ -298,13 +298,13 @@ dev.off()
 
 
 #import the desired read counts
-read_counts <- read.delim("../sRNA_counts/small_sa_og_norRNA_25_33_counts.txt", sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
+read_counts <- read.delim(file.path(data_directory, "sRNA_counts/small_sa_og_norRNA_25_33_counts.txt"), sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
 read_counts <- read_counts[,4:19]
 
-rRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+rRNA <- read.table(file.path(alignments_directory, "biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt"), header = FALSE, stringsAsFactors = FALSE)
 read_counts <- read_counts[!(rownames(read_counts) %in% rRNA$V1),]
 
-YRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_YRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+YRNA <- read.table(file.path(alignments_directory,"biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_YRNA.txt"), header = FALSE, stringsAsFactors = FALSE)
 read_counts <- read_counts[!(rownames(read_counts) %in% YRNA$V1),]
 
 
@@ -312,7 +312,7 @@ read_counts <- read_counts[!(rownames(read_counts) %in% YRNA$V1),]
 
 read_counts <- cpm(read_counts)
 
-filters <- list.files("../alignments/biogenesis_alignments_norRNA_25_33/", full.names = TRUE)
+filters <- list.files(file.path(alignments_directory, "biogenesis_alignments_norRNA_25_33"), full.names = TRUE)
 titles <- c("Clusters",  "3' UTR", "mRNA",  "lincRNA", "lncRNA","miRNA",  "piRBase\nOriginal", "Extended\npiRBase\nTranscriptome", "tRNA", "Repeat", "snoRNA", "YRNA")
 
 
@@ -323,7 +323,7 @@ df <- as.data.frame(matrix(nrow = 16, ncol = 0, byrow = TRUE))
 df$cell_line <- c("387++","456++","3359++","3691++","3832++","4121++","4302++","H2S++","387-","456-","3359-","3691-","3832-","4121-","4302-","H2S-")
 df$cell_type <- factor(c(rep("GSC", 8), (rep("Non-GSC",8))))
 #df$RP_piRNA <- total_counts$sa_og_norRNA_25_33_noncRNA_repeat
-unique <- read.table("../alignments/small_sa_og_norRNA_alignments_uniquemapping_list.txt", header = FALSE, stringsAsFactors = FALSE)
+unique <- read.table(file.path(alignments_directory, "small_sa_og_norRNA_alignments_uniquemapping_list.txt"), header = FALSE, stringsAsFactors = FALSE)
 temp <- df
 df$piRNA <- "Unique\nMapping piRNA"
 temp$piRNA <- "Repeat\nMapping piRNA"
@@ -423,15 +423,15 @@ dev.off()
 
 
 #import the desired read counts
-read_counts <- read.delim("../sRNA_counts/small_sa_og_norRNA_25_33_counts.txt", sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
+read_counts <- read.delim(file.path(data_directory, "sRNA_counts/small_sa_og_norRNA_25_33_counts.txt"), sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
 read_counts <- read_counts[,4:19]
-rRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+rRNA <- read.table(file.path(alignments_directory, "biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt"), header = FALSE, stringsAsFactors = FALSE)
 read_counts <- read_counts[!(rownames(read_counts) %in% rRNA$V1),]
-YRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_YRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+YRNA <- read.table(file.path(alignments_directory, "biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_YRNA.txt"), header = FALSE, stringsAsFactors = FALSE)
 read_counts <- read_counts[!(rownames(read_counts) %in% YRNA$V1),]
 read_counts <- cpm(read_counts)
 
-filters <- list.files("../alignments/biogenesis_alignments_norRNA_25_33/", full.names = TRUE)
+filters <- list.files(file.path(alignments_directory, "biogenesis_alignments_norRNA_25_33"), full.names = TRUE)
 titles <- c("Clusters",  "3' UTR", "mRNA",  "lincRNA", "lncRNA","miRNA",  "Original\npiRNAbase", "Extended\npiRBase\nTranscriptome", "tRNA", "Repeat", "snoRNA", "YRNA")
 
 
@@ -442,7 +442,7 @@ df <- as.data.frame(matrix(nrow = 16, ncol = 0, byrow = TRUE))
 df$cell_line <- c("387++","456++","3359++","3691++","3832++","4121++","4302++","H2S++","387-","456-","3359-","3691-","3832-","4121-","4302-","H2S-")
 df$cell_type <- factor(c(rep("GSC", 8), (rep("Non-GSC",8))))
 #df$RP_piRNA <- total_counts$sa_og_norRNA_25_33_noncRNA_repeat
-unique <- read.table("../alignments/small_sa_og_norRNA_alignments_uniquemapping_list.txt", header = FALSE, stringsAsFactors = FALSE)
+unique <- read.table(file.path(alignments_directory, "small_sa_og_norRNA_alignments_uniquemapping_list.txt"), header = FALSE, stringsAsFactors = FALSE)
 temp <- df
 df$piRNA <- "Unique\nMapping piRNA"
 temp$piRNA <- "Repeat\nMapping piRNA"
@@ -538,17 +538,17 @@ dev.off()
 
 
 #import the desired read counts
-read_counts <- read.delim("../sRNA_counts/small_sa_og_norRNA_25_33_counts.txt", sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
+read_counts <- read.delim(file.path(data_directory, "sRNA_counts/small_sa_og_norRNA_25_33_counts.txt"), sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
 read_counts <- read_counts[,4:19]
-rRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+rRNA <- read.table(file.path(alignments_directory, "biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt"), header = FALSE, stringsAsFactors = FALSE)
 read_counts <- read_counts[!(rownames(read_counts) %in% rRNA$V1),]
-YRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_YRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+YRNA <- read.table(file.path(alignments_directory, "biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_YRNA.txt"), header = FALSE, stringsAsFactors = FALSE)
 read_counts <- read_counts[!(rownames(read_counts) %in% YRNA$V1),]
 
 
 
 read_counts <- cpm(read_counts)
-filters <- list.files("../alignments/biogenesis_alignments_norRNA_25_33/", full.names = TRUE)
+filters <- list.files(file.path(alignments_directory, "biogenesis_alignments_norRNA_25_33"), full.names = TRUE)
 titles <- c("Clusters",  "3' UTR", "mRNA",  "lincRNA", "lncRNA","miRNA",  "piRBase\nOriginal", "Extended\npiRBase\nTranscriptome", "tRNA", "Repeat", "snoRNA", "YRNA")
 
 
@@ -558,7 +558,7 @@ df <- as.data.frame(matrix(nrow = 16, ncol = 0, byrow = TRUE))
 df$cell_line <- c("387++","456++","3359++","3691++","3832++","4121++","4302++","H2S++","387-","456-","3359-","3691-","3832-","4121-","4302-","H2S-")
 df$cell_type <- factor(c(rep("GSC", 8), (rep("Non-GSC",8))))
 #df$RP_piRNA <- total_counts$sa_og_norRNA_25_33_noncRNA_repeat
-unique <- read.table("../alignments/small_sa_og_norRNA_alignments_uniquemapping_list.txt", header = FALSE, stringsAsFactors = FALSE)
+unique <- read.table(file.path(alignments_directory, "small_sa_og_norRNA_alignments_uniquemapping_list.txt"), header = FALSE, stringsAsFactors = FALSE)
 temp <- df
 df$piRNA <- "Unique\nMapping piRNA"
 temp$piRNA <- "Repeat\nMapping piRNA"
@@ -707,17 +707,17 @@ dev.off()
 ```{r repeat_elements, echo = FALSE}
 
 #import the desired read counts
-read_counts <- read.delim("../sRNA_counts/small_sa_og_norRNA_25_33_counts.txt", sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
+read_counts <- read.delim(file.path(data_directory, "sRNA_counts/small_sa_og_norRNA_25_33_counts.txt"), sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
 
 read_counts <- read_counts[,4:19]
 
-rRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+rRNA <- read.table(file.path(alignments_directory, "biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt"), header = FALSE, stringsAsFactors = FALSE)
 read_counts <- read_counts[!(rownames(read_counts) %in% rRNA$V1),]
 
 read_counts <- as.data.frame(cpm(read_counts))
 #read_counts <- read_counts[rowSums(read_counts >0) >= 6,]
 
-rmsk <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_repeatmasker.txt", header = FALSE, stringsAsFactors = FALSE, sep = "\t")
+rmsk <- read.table(file.path(alignments_directory, "biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_repeatmasker.txt"), header = FALSE, stringsAsFactors = FALSE, sep = "\t")
 
 
 
@@ -788,16 +788,16 @@ dev.off()
 
 
 #import the desired read counts
-read_counts <- read.delim("../sRNA_counts/small_sa_og_norRNA_25_33_counts.txt", sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
+read_counts <- read.delim(file.path(data_directory, "sRNA_counts/small_sa_og_norRNA_25_33_counts.txt"), sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
 
 read_counts <- read_counts[,4:19]
 
-rRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+rRNA <- read.table(file.path(alignments_directory, "biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt"), header = FALSE, stringsAsFactors = FALSE)
 read_counts <- read_counts[!(rownames(read_counts) %in% rRNA$V1),]
 
 #read_counts <- read_counts[rowSums(read_counts >0) >= 6,]
 
-rmsk <- read.table("../alignments/small_sa_og_norRNA_alignments_repeatmasker_plus40.txt", header = FALSE, stringsAsFactors = FALSE, sep = "\t")
+rmsk <- read.table(file.path(alignements_directory, "small_sa_og_norRNA_alignments_repeatmasker_plus40.txt"), header = FALSE, stringsAsFactors = FALSE, sep = "\t")
 
 
 
