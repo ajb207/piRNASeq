@@ -11,6 +11,7 @@ This is RNAseq analysis of the comparison between GSC vs differentiated NPC (10 
 ```{r, cache=TRUE,echo=FALSE,eval=TRUE,warning=FALSE}
 
 source('global.R')
+data.directory = '~/MEGA/data_files'
 ```
 
 
@@ -19,7 +20,7 @@ source('global.R')
 ```{r GSC_vs_nonGSC}
 
 # load in the star counts
-read.counts <- importStarCounts(folder = "../../data_files/star_v5/", 
+read.counts <- importStarCounts(folder = file.path(data.directory, "/star_counts/"), 
                                 column = 4)
 # removing uneeded text from column names
 colnames(read.counts) <- gsub(pattern = "_dna_ReadsPerGene.out.tab", 
@@ -36,7 +37,7 @@ colnames(read.counts) <- c("387++","456++","3359++","3691++","3832++","4121++","
                            "hNP1_old","hNP1_new","17231","16157")
 # write the read counts for later reference
 write.table(x = read.counts,
-            file = "../../data_files/RNAseq_read_counts/all_read.counts.txt",
+            file = file.path(data.directory, "RNAseq_read_counts", "all_read.counts.txt"),
             sep = "\t",
             col.names = T)
 
@@ -58,7 +59,7 @@ read.counts <-
 
 # write this experiments counts to a file
 write.table(x = read.counts, 
-            file = "../../data_files/RNAseq_read_counts/GSC_and_nonGSC_readcounts.txt",
+            file = file.path(data.directory, "RNAseq_read_counts", "GSC_and_nonGSC_readcounts.txt"),
             sep = "\t",
             col.names = T)
 # organize to that the non-GSCs are the first and the control samples. GSCs are the treatments
@@ -128,12 +129,12 @@ voom_top_HGNC <- EnsembltoHGNC(voom_top)
 #commented out for use only when needed
 
 write.table(x = voom.all_HGNC, 
-            file = "../../data_files/RNAseq_expressed_genes/GSC_vs_nonGSC_all_differentially_expressed_genes.csv",
+            file = file.path(data.directory, "RNAseq_expressed_genes", "GSC_vs_nonGSC_all_differentially_expressed_genes.csv"),
             quote = FALSE, 
             sep = ",", 
             row.names = T)
 write.table(x = voom_top_HGNC,
-            file = "../../data_files/RNAseq_expressed_genes/GSC_vs_nonGSC_top_pval05_differentially_expressed_genes.csv", 
+            file = file.path(data.directory, "RNAseq_expressed_genes", "GSC_vs_nonGSC_top_pval05_differentially_expressed_genes.csv"), 
             quote = FALSE, 
             sep = ",",
             row.names = T)
@@ -146,7 +147,7 @@ write.table(x = voom_top_HGNC,
 
 ```{r fgsea}
 # read in the conversion file to change gene identifiers
-conversion <- read.table(file = "../../conversion_sets/ensembl_to_entrez.txt", 
+conversion <- read.table(file = file.path(data.directory, "conversion_sets", "ensembl_to_entrez.txt"), 
                          stringsAsFactors = F, 
                          sep = "\t", 
                          header = T)
@@ -170,7 +171,7 @@ fgseaRes <- fgsea(pathways = pathways,
                   maxSize = 500)
 
 
-pdf("../../data_files/GSEA/GSC_vs_nonGSC_gsea.pdf", 14,8)
+pdf(file.path(data.directory, "GSEA", "GSC_vs_nonGSC_gsea.pdf", 14,8))
 topPathwaysUp <- fgseaRes[ES > 0][head(order(pval), n=10), pathway]
 topPathwaysDown <- fgseaRes[ES < 0][head(order(pval), n=10), pathway]
 topPathways <- c(topPathwaysUp, rev(topPathwaysDown))
@@ -192,7 +193,7 @@ dev.off()
 
 ```{r GSC_vs_HNPC}
 # load in the star counts
-read.counts <-importStarCounts("../../data_files/star_v5/", column = 4)
+read.counts <-importStarCounts(file.path(data.directory, "star_counts/"), column = 4)
 # removing uneeded text from column names
 colnames(read.counts) <- gsub(pattern = "_dna_ReadsPerGene.out.tab", 
                               replacement = "",
@@ -200,7 +201,7 @@ colnames(read.counts) <- gsub(pattern = "_dna_ReadsPerGene.out.tab",
 
 # write the read counts for later reference
 write.table(x = read.counts,
-            file = "../../data_files/GSEA/GSC_vs_HNPC_read.counts.txt",
+            file = file.path(data.directory, "GSEA", "GSC_vs_HNPC_read.counts.txt"),
             sep = "\t",
             col.names = T)
 
@@ -292,21 +293,21 @@ voom_top_HGNC <- EnsembltoHGNC(voom_top)
 
 # write expression results to file
 write.table(x = voom.all_HGNC, 
-            file = "../../data_files/RNAseq_expressed_genes/GSC_vs_HNPC_all_differentially_expressed_genes.csv",
+            file = file.path(data.directory, "RNAseq_expressed_genes", "GSC_vs_HNPC_all_differentially_expressed_genes.csv"),
             quote = FALSE,
             sep = ",",
             row.names = F)
 write.table(x = voom_top_HGNC, 
-            file = "../../data_files/RNAseq_expressed_genes/GSC_vs_HNPC_top_pval05_differentially_expressed_genes.csv",
+            file = file.path(data.directory, "RNAseq_expressed_genes", "GSC_vs_HNPC_top_pval05_differentially_expressed_genes.csv"),
             quote = FALSE, 
             sep = ",",
             row.names = F)
 
 
 # load conversion file to convert gene names
-conversion <- read.table(file = "../../conversion_sets/ensembl_to_entrez.txt",
+conversion <- read.table(file = file.path(data.directory, "conversion_sets", "ensembl_to_entrez.txt"), 
                          stringsAsFactors = F, 
-                         sep = "\t",
+                         sep = "\t", 
                          header = T)
 stats <- as.data.frame(voom.all_HGNC$logFC)
 stats$hgnc_symbol <- voom.all_HGNC$hgnc_symbol
@@ -327,7 +328,7 @@ data("exampleRanks")
 fgseaRes <- fgsea(pathways = pathways,stats = ranks, nperm = 10000, maxSize = 500)
 
 
-pdf("../../data_files/GSEA/GSC_vs_HNPC_gsea.pdf", 14,8)
+pdf(file.path(data.directory, "GSEA", "GSC_vs_HNPC_gsea.pdf"), 14,8)
 topPathwaysUp <- fgseaRes[ES > 0][head(order(pval), n=10), pathway]
 topPathwaysDown <- fgseaRes[ES < 0][head(order(pval), n=10), pathway]
 topPathways <- c(topPathwaysUp, rev(topPathwaysDown))
@@ -348,7 +349,7 @@ dev.off()
 
 ```{r RSEM}
 #read in the RSEM counts
-read.counts <- read.table("../../data_files/RSEM_out/rsem_isoforms_matrix.txt")
+read.counts <- read.table(file.path(data.directory, "RSEM_out", "rsem_isoforms_matrix.txt"))
 
 
 #change column names to the samples names form the data
@@ -421,7 +422,7 @@ voom_top <- topTable(fit = fit,
 # name conversion to HGNC symbols
 # TODO clean up name conversions
 voom_top$transcript_id <- rownames(voom_top)
-conversion <- read.table(file = "../../conversion_sets/ensembl_conversion.txt",
+conversion <- read.table(file = file.path(data.directory, "conversion_sets", "ensembl_conversion.txt"),
                          stringsAsFactors = F, 
                          sep = "\t",
                          header = T)
@@ -437,12 +438,12 @@ voom.all_HGNC <- merge(x = voom.all,
 
 # write the differently expressed transcripts to file
 write.table(x = voom.all_HGNC,
-            file = "../../data_files/RNAseq_expressed_genes/GSC_vs_nonGSC_all_differentially_expressed_transcripts.csv",
+            file = file.path(data.directory, "RNAseq_expressed_genes", "GSC_vs_nonGSC_all_differentially_expressed_transcripts.csv"),
             quote = FALSE, 
             sep = ",",
             row.names = F)
 write.table(x = voom_top_HGNC, 
-            file = "../../data_files/RNAseq_expressed_genes/GSC_vs_nonGSC_top_pval05_differentially_expressed_transcripts.csv",
+            file = file.path(data.directory, "RNAseq_expressed_genes", "GSC_vs_nonGSC_top_pval05_differentially_expressed_transcripts.csv"),
             quote = FALSE, 
             sep = ",",
             row.names = F)
@@ -460,7 +461,7 @@ write.table(x = voom_top_HGNC,
 ```{r SRP040525}
 
 #load in the star counts
-read.counts <- importStarCounts(folder = "../../data_files/SRP040525_gene_counts/", 
+read.counts <- importStarCounts(folder = file.path(data.directory, "SRP040525_gene_counts/"), 
                                 column = 4)
 # remove unnecessary name data
 colnames(read.counts) <- gsub(pattern = "ReadsPerGene.out.tab", "", colnames(read.counts))
