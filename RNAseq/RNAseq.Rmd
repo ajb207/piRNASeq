@@ -11,6 +11,7 @@ This is RNAseq analysis of the comparison between GSC vs differentiated NPC (10 
 ```{r, cache=TRUE,echo=FALSE,eval=TRUE,warning=FALSE}
 
 source('global.R')
+source('RNAseq_functions.R')
 data.directory = '~/MEGA/data_files'
 ```
 
