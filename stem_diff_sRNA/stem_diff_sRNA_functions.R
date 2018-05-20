@@ -1,3 +1,4 @@
+source('global.R')
 
 #compute various information about the alignments.
 alignmentInfo <- 
