@@ -13,7 +13,9 @@ source('global.R')
 options(scipen=999)
 
 
+data_directory = '~/MEGA/data_files'
 
+alignments_directory = file.path(data_directory, 'stem_diff_alignments')
 
 #load in the gene expression from RNA seq experiment
 gene_expression <- read.csv(file = "../../RNAseq/data/StemVsDiff_all_DE_genes.txt", 
@@ -38,17 +40,17 @@ conversion <- read.table("../../conversion_sets//ensembl_conversion.txt", header
 # TODO replace with dplyr stuff
 # TODO create expressions with no tRNA
 #import the desired read counts
-read.counts <- read.csv(file = "../sRNA_counts/small_sa_og_norRNA_25_33_counts.txt", 
+read.counts <- read.csv(file = file.path(data_directory, "sRNA_counts/small_sa_og_norRNA_25_33_counts.txt"), 
                         stringsAsFactors=FALSE,
                         row.names = 1)[,]
 
 #remove non used reads
-rRNA <- read.table(file = "../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt",
+rRNA <- read.table(file = file.path(alignments_directory, "biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt"),
                    header = FALSE, 
                    stringsAsFactors = FALSE)
 
 read.counts <- read.counts[!(rownames(read.counts) %in% rRNA$V1),]
-YRNA <- read.table(file = "../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_YRNA.txt", 
+YRNA <- read.table(file = file.path(allignments_directory, "biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_YRNA.txt"),
                    header = FALSE, 
                    stringsAsFactors = FALSE)
 read.counts <- read.counts[!(rownames(read.counts) %in% YRNA$V1),]
@@ -131,41 +133,47 @@ voom.top.sRNA$sRNA <- rownames(voom.top.sRNA)
 ```{r piRNA_information_addition}
 # TODO add info for counts too
 #tRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_tRNA.txt", header = FALSE, stringsAsFactors = FALSE)
-lncRNA <- read.table(file = "../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_lncRNA.txt",
+lncRNA <- read.table(file = file.path(alignments_directory, "biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_lncRNA.txt"),
                      header = FALSE, 
                      stringsAsFactors = FALSE)
-unique <- read.table(file = "../alignments/small_sa_og_norRNA_alignments_uniquemapping_list.txt", 
+unique <- read.table(file = file.path(alignments_directory, "small_sa_og_norRNA_alignments_uniquemapping_list.txt"),
                      header = FALSE, 
                      stringsAsFactors = FALSE)
-piRBase <- read.table(file = "../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_piRNA.txt", 
+piRBase <- read.table(file = file.path(alignments_directory, "biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_piRNA.txt"),
                       header = FALSE, 
                       stringsAsFactors = FALSE)
-piRBaseplus15 <- read.table(file = "../alignments/biogenesis_alignments_norRNA_25_33/small_sa_og_norRNA_25_33_list_alignments_piRNAbaseplus15_list.txt",
+piRBaseplus15 <- read.table(file = file.path(alignments_directory, "biogenesis_alignments_norRNA_25_33/small_sa_og_norRNA_25_33_list_alignments_piRNAbaseplus15_list.txt"),
                             header = FALSE,
                             stringsAsFactors = FALSE)
-YRNA <- read.table(file = "../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_YRNA.txt", 
+YRNA <- read.table(file = file.path(alignments_directory, "biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_YRNA.txt"), 
                    header = FALSE, 
                    stringsAsFactors = FALSE)
-snoRNA <- read.table(fle = "../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_snoRNA.txt",
+snoRNA <- read.table(file = file.path(alignments_directory, "biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_snoRNA.txt"),
                      header = FALSE, 
                      stringsAsFactors = FALSE)
-miRNA <- read.table(file = "../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_miRNA.txt",
+miRNA <- read.table(file = file.path(alignments_directory, "biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_miRNA.txt"),
                     header = FALSE, 
                     stringsAsFactors = FALSE, sep = "\t")
-mRNA <- read.table(file = "../alignments/biogenesis_alignments_norRNA_25_33/small_sa_og_norRNA_25_33_list_alignments_cDNA_list.txt",
+mRNA <- read.table(file = file.path(alignments_directory, "biogenesis_alignments_norRNA_25_33/small_sa_og_norRNA_25_33_list_alignments_cDNA_list.txt"),
                    header = FALSE, 
                    stringsAsFactors = FALSE)
-rmsk <- read.table(file = "../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_repeatmasker.txt", 
+rmsk <- read.table(file = file.path(alignments_directory, "biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_repeatmasker.txt"), 
                    header = FALSE, 
                    stringsAsFactors = FALSE,
                    sep = "\t")
 colnames(rmsk) <- c("sRNA", "Repeat Name")
 rmsk$`Repeat Name` <- gsub(pattern = "_", replacement = "", rmsk$`Repeat Name`)
-rmsk_plus40 <- read.table("../alignments/small_sa_og_norRNA_alignments_repeatmasker_plus40.txt", header = FALSE, stringsAsFactors = FALSE)
+rmsk_plus40 <- read.table(file = file.path(alignments_directory, "biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_repeatmasker_plus40.txt"),
+                                           header = FALSE,
+                                           stringsAsFactors = FALSE)
 #tRNA <- rmsk[grepl(pattern = "tRNA", x = rmsk$'Repeat Name'),]
-tRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_repeatmasker_tRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+tRNA <- read.table(file = file.path(alignments_directory, "biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_repeatmasker_tRNA.txt"),
+                   header = FALSE,
+                   stringsAsFactors = FALSE)
 colnames(tRNA) <- c("sRNA", "tRNA Name")
-tRNA_plus40 <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_repeatmasker_plus40_tRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+tRNA_plus40 <- read.table(file = file.path(alignments_directory, "biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_repeatmasker_plus40_tRNA.txt"),
+                          header = FALSE, 
+                          stringsAsFactors = FALSE)
 colnames(tRNA_plus40) <- c("sRNA", "Extended tRNA Name")
 
 
@@ -188,15 +196,20 @@ voom.top.sRNA <- merge(voom.top.sRNA, rmsk[,c(1:2)], by = 'sRNA', all.x = T)
 voom.top.sRNA$'Extended Repeat Masker' <- ifelse(voom.top.sRNA$sRNA %in% rmsk_plus40$V1, T, F)
 
 
-write.table(voom.top.sRNA, "../data/differential_expression//GSC_vs_nonGSC_top_pval<05_differentially_expressed_putative_piRNA.csv", sep = ",", row.names = F, quote = F)
+write.table(voom.top.sRNA, file = file.path(data_directory, 'stem_diff_expressions', 'GSC_vs_nonGSC_piRNA_differential_expression', 'GSC_vs_nonGSC_top_pval05_differentially_expressed_putative_piRNA.csv'),
+                                            sep = ",", 
+                                            row.names = F, 
+                                            quote = F)
 
 GSC_read_counts <- read_counts[rownames(read_counts) %in% voom.top.sRNA$sRNA[voom.top.sRNA$logFC > 0],]
 GSC_read_counts$sRNA <- rownames(GSC_read_counts)
 nonGSC_read_counts <- read_counts[rownames(read_counts) %in% voom.top.sRNA$sRNA[voom.top.sRNA$logFC < 0],]
 nonGSC_read_counts$sRNA <- rownames(nonGSC_read_counts)
 
-write.table(GSC_read_counts, "../data/GSC_upregulated_pval<05_putative_piRNA.csv", sep = ",", row.names = F, quote = F,col.names = T)
-write.table(nonGSC_read_counts, "../data/nonGSC_upregulated_pval<05_putative_piRNA.csv", sep = ",", row.names = F, quote = F,col.names = T)
+write.table(GSC_read_counts, file = file.path(data_directory, 'stem_diff_expressions', 'GSC_vs_nonGSC_piRNA_differential_expression',"GSC_upregulated_pval05_putative_piRNA.csv"),
+            sep = ",", row.names = F,quote = F,col.names = T)
+write.table(nonGSC_read_counts, file = file.path(data_directory, 'stem_diff_expressions', 'GSC_vs_nonGSC_piRNA_differential_expression', "nonGSC_upregulated_pval05_putative_piRNA.csv"),
+            sep = ",", row.names = F, quote = F,col.names = T)
 
 #annotating all reads
 
@@ -220,7 +233,8 @@ voom.sRNA <- merge(voom.sRNA, rmsk[,c(1:2)], by = 'sRNA', all.x = T)
 voom.sRNA$'Extended Repeat Masker' <- ifelse(voom.sRNA$sRNA %in% rmsk_plus40$V1, T, F)
 
 
-write.table(voom.sRNA, "../data/differential_expression/GSC_vs_nonGSC_all_differentially_expressed_putative_piRNA.csv", sep = ",", row.names = F, quote = F)
+write.table(voom.sRNA, file = file.path(data_directory, 'stem_diff_expressions', 'GSC_vs_nonGSC_piRNA_differential_expression', "GSC_vs_nonGSC_all_differentially_expressed_putative_piRNA.csv"),
+            sep = ",", row.names = F, quote = F)
 
 
 #tRNA derived piRNA
@@ -228,25 +242,27 @@ write.table(voom.top.sRNA$sRNA[voom.top.sRNA$tRNA], "../data/meme_files/DE_tRNA_
 write.table(createpiRNAFasta("../data/meme_files/DE_tRNA_piRNA.txt"), "../data/meme_files/DE_tRNA_piRNA.fa", quote= F, row.names = F, col.names = F, sep = "\t")
 writeXStringSet(trimFastaTo("../data/meme_files/DE_tRNA_piRNA.fa", 1, 10), "../data/meme_files/DE_tRNA_piRNA_10bp.fa" )
 
-write.table(voom.top.sRNA$sRNA[voom.top.sRNA$mRNA], "../data/meme_files/DE_mRNA_piRNA.txt", quote=F, row.names = F, col.names = F)
-write.table(createpiRNAFasta("../data/meme_files/DE_mRNA_piRNA.txt"), "../data/meme_files/DE_mRNA_piRNA.fa", quote= F, row.names = F, col.names = F, sep = "\t")
-writeXStringSet(trimFastaTo("../data/meme_files/DE_mRNA_piRNA.fa", 1, 10), "../data/meme_files/DE_mRNA_piRNA_10bp.fa" )
+write.table(voom.top.sRNA$sRNA[voom.top.sRNA$mRNA], file = file.path(data_directory, "meme_files", "DE_mRNA_piRNA.txt"),
+            quote=F, row.names = F, col.names = F)
+write.table(createpiRNAFasta(file = file.path(data_directory, "meme_files", "DE_mRNA_piRNA.txt")),file = file.path(data_directory, "meme_files", "DE_mRNA_piRNA.fa"),
+                              quote= F, row.names = F, col.names = F, sep = "\t")
+writeXStringSet(trimFastaTo(file = file.path(data_directory, "meme_files", "DE_mRNA_piRNA.fa"), 1, 10), file = file.path(data_directory, "meme_files", "DE_mRNA_piRNA_10bp.fa" ))
 
 #unique derived piRNA
-write.table(voom.top.sRNA$sRNA[voom.top.sRNA$unique_mapping], "../data/meme_files/DE_UM_piRNA.txt", quote=F, row.names = F, col.names = F)
-write.table(createpiRNAFasta("../data/meme_files/DE_UM_piRNA.txt"), "../data/meme_files/DE_UM_piRNA.fa", quote= F, row.names = F, col.names = F, sep = "\t")
-writeXStringSet(trimFastaTo("../data/meme_files/DE_UM_piRNA.fa", 1, 10), "../data/meme_files/DE_UM_piRNA_10bp.fa" )
+write.table(voom.top.sRNA$sRNA[voom.top.sRNA$unique_mapping], file = file.path(data_directory, "meme_files", "DE_UM_piRNA.txt"), quote=F, row.names = F, col.names = F)
+write.table(createpiRNAFasta(file.path(data_directory, "meme_files", "DE_UM_piRNA.txt")), file = file.path(data_directory, "meme_files", "DE_UM_piRNA.fa"), quote= F, row.names = F, col.names = F, sep = "\t")
+writeXStringSet(trimFastaTo(file.path(data_directory, "meme_files", "DE_UM_piRNA.fa"), 1, 10), "../data/meme_files/DE_UM_piRNA_10bp.fa" )
 
 #repeat derived piRNA
 write.table(voom.top.sRNA$sRNA[voom.top.sRNA$unique_mapping == FALSE], "../data/meme_files/DE_RD_piRNA.txt", quote=F, row.names = F, col.names = F)
-write.table(createpiRNAFasta("../data/meme_files/DE_RD_piRNA.txt"), "../data/meme_files/DE_RD_piRNA.fa", quote= F, row.names = F, col.names = F, sep = "\t")
-writeXStringSet(trimFastaTo("../data/meme_files/DE_RD_piRNA.fa", 1, 10), "../data/meme_files/DE_RD_piRNA_10bp.fa" )
+write.table(createpiRNAFasta(file.path(data_directory, "meme_files", "DE_RD_piRNA.txt")), file.path(data_directory, "meme_files", "DE_RD_piRNA.fa"), quote= F, row.names = F, col.names = F, sep = "\t")
+writeXStringSet(trimFastaTo(file.path(data_directory, "meme_files", "DE_RD_piRNA.fa"), 1, 10), file.path(data_directory, "meme_files", "DE_RD_piRNA_10bp.fa"))
 
 
 #repeatmasker derived piRNA
 write.table(voom.top.sRNA$sRNA[voom.top.sRNA$rmsk == T & voom.top.sRNA$tRNA == F], "../data/meme_files/DE_rmsk_notRNA_piRNA.txt", quote=F, row.names = F, col.names = F)
-write.table(createpiRNAFasta("../data/meme_files/DE_rmsk_notRNA_piRNA.txt"), "../data/meme_files/DE_rmsk_notRNA_piRNA.fa", quote= F, row.names = F, col.names = F, sep = "\t")
-writeXStringSet(trimFastaTo("../data/meme_files/DE_rmsk_notRNA_piRNA.fa", 1, 10), "../data/meme_files/DE_rmsk_notRNA_piRNA_10bp.fa" )
+write.table(createpiRNAFasta(file.path(data_directory, "meme_files", "DE_rmsk_notRNA_piRNA.txt")), file.path(data_directory, "meme_files","DE_rmsk_notRNA_piRNA.fa"), quote= F, row.names = F, col.names = F, sep = "\t")
+writeXStringSet(trimFastaTo(file.path(data_directory, "meme_files", "DE_rmsk_notRNA_piRNA.fa"), 1, 10), file.path(data_directory, "meme_files","DE_rmsk_notRNA_piRNA_10bp.fa"))
 
 
 
@@ -258,35 +274,35 @@ writeXStringSet(trimFastaTo("../data/meme_files/DE_rmsk_notRNA_piRNA.fa", 1, 10)
 ```{r miRNA_import_reads, echo = FALSE}
 
 #import the desired read counts
-read.counts <- read.csv(file = "../sRNA_counts/small_sa_og_norRNA_noncRNA_18_24_counts.txt", 
+read.counts <- read.csv(file = file.path(data_directory, "sRNA_counts", "small_sa_og_norRNA_noncRNA_18_24_counts.txt"), 
                         stringsAsFactors=FALSE,
                         row.names = 1)[,]
 #select only the cell lines used in the experiment
-rRNA <- read.table(file = "../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt", 
+rRNA <- read.table(file = file.path(alignments_directory, "biogenesis_small_sa_og_norRNA", "small_sa_og_norRNA_alignments_rRNA.txt"), 
                    header = FALSE,
                    stringsAsFactors = FALSE)
 read.counts <- read.counts[!(rownames(read.counts) %in% rRNA$V1),]
 
 
-tRNA <- read.table(file = "../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_repeatmasker_tRNA.txt",
+tRNA <- read.table(file = file.path(alignments_directory, "biogenesis_small_sa_og_norRNA", "small_sa_og_norRNA_alignments_repeatmasker_tRNA.txt"),
                    header = FALSE,
                    stringsAsFactors = FALSE)
-lncRNA <- read.table(file = "../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_lncRNA.txt", 
+lncRNA <- read.table(file = file.path(alignments_directory, "biogenesis_small_sa_og_norRNA", "small_sa_og_norRNA_alignments_lncRNA.txt"), 
                      header = FALSE, 
                      stringsAsFactors = FALSE)
-unique <- read.table(file = "../alignments/small_sa_og_norRNA_alignments_uniquemapping_list.txt", 
+unique <- read.table(file = file.path(alignments_directory, "small_sa_og_norRNA_alignments_uniquemapping_list.txt"), 
                      header = FALSE,
                      stringsAsFactors = FALSE)
-piRNA <- read.table(file = "../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_piRNA.txt",
+piRNA <- read.table(file = file.path(alignments_directory, "biogenesis_small_sa_og_norRNA", "small_sa_og_norRNA_alignments_piRNA.txt"),
                     header = FALSE,
                     stringsAsFactors = FALSE)
-YRNA <- read.table(file = "../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_YRNA.txt",
+YRNA <- read.table(file = file.path(alignments_directory, "biogenesis_small_sa_og_norRNA", "small_sa_og_norRNA_alignments_YRNA.txt"),
                    header = FALSE, 
                    stringsAsFactors = FALSE)
-snoRNA <- read.table(file = "../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_snoRNA.txt",
+snoRNA <- read.table(file = file.path(alignments_directory, "biogenesis_small_sa_og_norRNA", "small_sa_og_norRNA_alignments_snoRNA.txt"),
                      header = FALSE, 
                      stringsAsFactors = FALSE)
-rmsk <- read.table(file = "../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_repeatmasker.txt", 
+rmsk <- read.table(file = file.path(alignments_directory, "biogenesis_small_sa_og_norRNA", "small_sa_og_norRNA_alignments_repeatmasker.txt"), 
                    header = FALSE, 
                    stringsAsFactors = FALSE)
 
@@ -296,6 +312,7 @@ read.counts <- read.counts[!(rownames(read.counts) %in% YRNA$V1),]
 read.counts <- read.counts[!(rownames(read.counts) %in% snoRNA$V1),]
 read.counts <- read.counts[!(rownames(read.counts) %in% rmsk$V1),]
 
+# TODO redo this alignment
 mycoplasm <- read.table(file = "../alignments/miRNA/small_sa_og_norRNA_noncRNA_18_24_alignments_mhyorhinisdna.txt",
                         header = FALSE, 
                         stringsAsFactors = FALSE)
@@ -303,7 +320,7 @@ mycoplasm <- read.table(file = "../alignments/miRNA/small_sa_og_norRNA_noncRNA_1
 read.counts <- read.counts[!(rownames(read.counts) %in% mycoplasm$V1),]
 
 
-miRNA <- read.table(file = "../alignments/small_sa_og_norRNA_list_alignments_miRNA.txt", 
+miRNA <- read.table(file = file.path(alignments_directory, "small_sa_og_norRNA_list_alignments_miRNA.txt"), 
                     header = FALSE, 
                     stringsAsFactors = FALSE, 
                     sep = "\t")
@@ -399,8 +416,8 @@ voom.sRNA$sRNA <- rownames(voom.sRNA)
 voom.top.sRNA <- voom.top
 voom.top.sRNA$sRNA <- rownames(voom.top.sRNA)
 
-write.table(voom.sRNA, "../data/GSC_vs_nonGSC_miRNA_differential_expression//GSC_vs_nonGSC_all_differentially_expressed_miRNA.csv", sep = ",", row.names = F, quote = F)
-write.table(voom.top.sRNA, "../data/GSC_vs_nonGSC_miRNA_differential_expression/GSC_vs_nonGSC_top_pval<05_differentially_expressed_miRNA.csv", sep = ",", row.names = F, quote = F)
+write.table(voom.sRNA, file.path(data_directory, 'stem_diff_expressions', "GSC_vs_nonGSC_miRNA_differential_expression", "GSC_vs_nonGSC_all_differentially_expressed_miRNA.csv"), sep = ",", row.names = F, quote = F)
+write.table(voom.top.sRNA, file.path(data_directory, 'stem_diff_expressions',  "GSC_vs_nonGSC_miRNA_differential_expression", "GSC_vs_nonGSC_top_pval05_differentially_expressed_miRNA.csv"), sep = ",", row.names = F, quote = F)
 
 #voom.top.sRNA$sRNA <- rownames(voom.top.sRNA)
 #voom.top.sRNA <- merge(voom.sRNA, miRNA, by.x = "sRNA", by.y = "V1", all.x = T)
@@ -417,11 +434,16 @@ write.table(voom.top.sRNA, "../data/GSC_vs_nonGSC_miRNA_differential_expression/
 ```{r targeting_reads, echo = FALSE}
 
 #import the desired read counts
-read.counts <- read.delim("../sRNA_counts/small_sa_og_norRNA_25_33_counts.txt", sep=",", stringsAsFactors=FALSE, row.names = 1)
+read.counts <- read.delim(file.path(data_directory, "sRNA_counts", "small_sa_og_norRNA_25_33_counts.txt"), sep=",", stringsAsFactors=FALSE, row.names = 1)
 
-rRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_rRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+
+rRNA <- read.table(file = file.path(alignments_directory, "biogenesis_small_sa_og_norRNA", "small_sa_og_norRNA_alignments_rRNA.txt"), 
+                   header = FALSE,
+                   stringsAsFactors = FALSE)
 read.counts <- read.counts[!(rownames(read.counts) %in% rRNA$V1),]
-YRNA <- read.table("../alignments/biogenesis_small_sa_og_norRNA/small_sa_og_norRNA_alignments_YRNA.txt", header = FALSE, stringsAsFactors = FALSE)
+YRNA <- read.table(file = file.path(alignments_directory, "biogenesis_small_sa_og_norRNA", "small_sa_og_norRNA_alignments_YRNA.txt"),
+                   header = FALSE, 
+                   stringsAsFactors = FALSE)
 read.counts <- read.counts[!(rownames(read.counts) %in% YRNA$V1),]
 read.counts <- removeRepeats(read.counts)
 
@@ -491,12 +513,12 @@ voom.top.sRNA$sRNA <- rownames(voom.top.sRNA)
 
 #write.table(rownames(voom.sRNA), "../data/temp_read_names.txt", quote=F, row.names = F, col.names = F)
 write.table(x = voom.sRNA, 
-            file = "../data/GSC_vs_nonGSC_targeting_sequences_differential_expression/GSC_vs_nonGSC_all_differentially_expressed_targeting_sequences.csv",
+            file = file.path(data_directory, 'stem_diff_expressions', "GSC_vs_nonGSC_targeting_sequences_differential_expression", "GSC_vs_nonGSC_all_differentially_expressed_targeting_sequences.csv"),
             quote=F, 
             row.names = T, 
             col.names = T, 
             sep = ",")
-write.table(x = voom.top.sRNA, file = "../data/GSC_vs_nonGSC_targeting_sequences_differential_expression/GSC_vs_nonGSC_top_pval<05_differentially_expressed_targeting_sequences.csv",
+write.table(x = voom.top.sRNA, file = file.path(data_directory, "GSC_vs_nonGSC_targeting_sequences_differential_expression", "GSC_vs_nonGSC_top_pval<05_differentially_expressed_targeting_sequences.csv"),
             quote=F,
             row.names = T,
             col.names = T, 
@@ -513,7 +535,7 @@ write.table(x = voom.top.sRNA, file = "../data/GSC_vs_nonGSC_targeting_sequences
 ```{r SRA, echo = FALSE}
 
 #import the desired read counts
-read.counts <- read.csv(file = "../sRNA_counts/sra_all_sa_og_norRNA_25_33_read.counts.txt",
+read.counts <- read.csv(file = file.path(data_directory, "sRNA_counts", "sra_all_sa_og_norRNA_25_33_read.counts.txt"),
                         stringsAsFactors=FALSE, row.names = 1)[,]
 #filter <- read.table("../fastx_files/sra_all_sa_og_norRNA_list.txt", header = FALSE, stringsAsFactors = FALSE)
 #read.counts <- read.counts[(rownames(read.counts) %in% filter$V1),]
@@ -526,7 +548,7 @@ colnames(read.counts) <- gsub(colnames(read.counts),
 #read.counts <-  read.counts[,-c(26,27,28,29,30)]
 read.counts <- read.counts[,c(26:29)]
 
-filters <- list.files("../alignments/biogenesis_alignments_sra/", full.names = T)
+filters <- list.files(file.path(alignments_directory, "biogenesis_alignments_sra/"), full.names = T)
 titles <- c("lncRNA", "miRNA", "piRNAbase", "repeat",  "snoRNA", "tRNA", "Y-RNA")
 
 #filters
@@ -599,7 +621,7 @@ ggplot(data = temp ) +
 
 
 #import the desired read counts
-read.counts <- read.delim("../sRNA_counts/SRA_clusters_counts.txt", sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
+read.counts <- read.delim(file.path(data_directory, 'sRNA_counts', "SRA_clusters_counts.txt"), sep=",", stringsAsFactors=FALSE, row.names = 1)[,]
 #select only the cell lines used in the experiment
 #read.counts <- read.counts[nchar(rownames(read.counts)) >17,]
 
@@ -610,7 +632,7 @@ colnames(read.counts) <- c( "OA1", "OA2", "O11", "O12", "O21", "O22","T1", "T2",
 
 read.counts <- read.counts[nchar(rownames(read.counts)) >= 25 & nchar(rownames(read.counts)) <=33, ]
 
-filters <- list.files("../alignments/biogenesis_small_sa_og_norRNA/", full.names = T)
+filters <- list.files(file.path(data_directory, 'sRNA_counts', "biogenesis_small_sa_og_norRNA/"), full.names = T)
 titles <- c("lncRNA", "miRNA", "piRNAbase", "rRNA",  "snoRNA", "tRNA", "Y-RNA")
 
 
